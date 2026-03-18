@@ -1,0 +1,70 @@
+//
+//  {{ file_name }}
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}.
+//
+
+import Foundation
+
+public enum LanguageCode: String {
+    case en
+    case hu
+    
+    var localizedValue: String {
+        switch self {
+        case .en:
+            Keys.languageCodeEn
+        case .hu:
+            Keys.languageCodeHu
+        }
+    }
+}
+
+public final class Localization {
+    public static let sharedInstance = Localization()
+    public var currentLanguageCode: LanguageCode {
+        _currentLanguageCode
+    }
+
+    // MARK: - Privates
+    private static let languageKey = "savedLanguage"
+    private let bundle: Bundle
+    
+    private var _currentLanguageCode: LanguageCode
+    
+    // MARK: - Init
+    private init(bundle: Bundle = .module) {
+        self.bundle = bundle
+        
+        if let storedLanguage = UserDefaults.standard.string(forKey: Self.languageKey),
+        let languageCode = LanguageCode(rawValue: storedLanguage) {
+            _currentLanguageCode = languageCode
+        } else {
+            let languageCode = LanguageCode(rawValue: Locale.current.identifier) ?? LanguageCode.en
+            UserDefaults.standard.setValue(languageCode.rawValue, forKey: Self.languageKey)
+            _currentLanguageCode = languageCode
+        }
+    }
+}
+
+public extension Localization {
+    func setLanguage(_ code: LanguageCode) {
+        _currentLanguageCode = code
+        UserDefaults.standard.setValue(code.rawValue, forKey: Self.languageKey)
+        NotificationCenter.default.post(name: .languageDidChange, object: nil)
+    }
+
+    /// Resolve localized string manually
+    func translate(_ key: String, _ table: String) -> String {
+        guard let path = bundle.path(forResource: _currentLanguageCode.rawValue, ofType: "lproj"),
+              let localizedBundle = Bundle(path: path)
+        else { return bundle.localizedString(forKey: key, value: key, table: table) }
+
+        return localizedBundle.localizedString(forKey: key, value: key, table: table)
+    }
+}
+
+public extension Notification.Name {
+    static let languageDidChange = Notification.Name("Localization.languageDidChange")
+}
