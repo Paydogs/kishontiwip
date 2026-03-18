@@ -25,7 +25,13 @@ let defaultApp = Target.target(
         .external(name: "Toolkit"),
         .external(name: "Swinject"),
         .external(name: "Logging")
-    ]
+    ],
+    settings: .settings(
+        base: [
+            "DEVELOPMENT_TEAM": "64GU57DP44",
+            "CODE_SIGN_STYLE": "Automatic"
+        ]
+    )
 )
 
 // 2. The Unit Test Target (XCTest / Swift Testing)
