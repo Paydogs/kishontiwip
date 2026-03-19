@@ -14,6 +14,7 @@ struct KishontiAdmissionTaskApp: App {
     private var appDelegate
     
 //    @StateObject private var peerService = GeneratedMultipeerService()
+
     let dispatcher: ActionDispatcher = Container.shared.actionDispatcher()
     let systemService: SystemService = Container.shared.systemService()
 

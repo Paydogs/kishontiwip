@@ -11,7 +11,6 @@ public typealias PeerIdentifier = String
 
 public struct AppState: StoreState {
     public var isAdvertising: Bool = false
-    public var isBrowsing: Bool = false
     public var discoveredPeers: [PeerIdentifier: Peer] = [:]
     public var connectedPeers: [PeerIdentifier: Peer]
     public var messages: [NetworkEventLogItem] = []

@@ -5,202 +5,188 @@
 //  Created by Andras Olah on 2026. 03. 19..
 //
 
-/*
+import Foundation
 import MultipeerConnectivity
+import os
 
-public struct PeerInvitation: Sendable {
-    let peer: PeerInfo
-    fileprivate let continuation: CheckedContinuation<Bool, Never>
-    
-    func accept() { continuation.resume(returning: true) }
-    func decline() { continuation.resume(returning: false) }
+struct PendingInvitation: Identifiable {
+    let id = UUID()
+    let peerID: MCPeerID
+    let handler: (Bool, MCSession?) -> Void
 }
 
-final class MultiPeerService: NSObject, @unchecked Sendable {
-    
+protocol MultiPeerService {
+    func startService()
+    func stopService()
+    func invite(peer: MCPeerID)
+    func acceptInvitation(_ invitation: PendingInvitation)
+    func declineInvitation(_ invitation: PendingInvitation)
+    func send(text: String)
+    func disconnect()
+}
+
+// MARK: - PeerService
+final class DefaultMultiPeerService: NSObject, MultiPeerService {
     private let myPeerID: MCPeerID
     private let session: MCSession
-    private let serviceType: String
-    
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
     
-    // Event stream
-    private var eventContinuation: AsyncStream<PeerEvent>.Continuation?
-    let events: AsyncStream<PeerEvent>
+    var pendingInvitation: PendingInvitation?
     
-    // Invitation stream
-    private var invitationContinuation: AsyncStream<PeerInvitation>.Continuation?
-    let invitations: AsyncStream<PeerInvitation>
-    
-    // MCPeerID → PeerInfo mapping
-    private let lock = NSLock()
-    private var peerMap: [MCPeerID: PeerInfo] = [:]
-    
-    init(displayName: String, serviceType: String = "peer-connect") {
-        self.serviceType = serviceType
+    override init() {
+        let displayName = UIDevice.current.name
         self.myPeerID = MCPeerID(displayName: displayName)
         self.session = MCSession(
             peer: myPeerID,
             securityIdentity: nil,
             encryptionPreference: .required
         )
-        
-        var eCont: AsyncStream<PeerEvent>.Continuation?
-        self.events = AsyncStream { eCont = $0 }
-        
-        var iCont: AsyncStream<PeerInvitation>.Continuation?
-        self.invitations = AsyncStream { iCont = $0 }
-        
         super.init()
-        
-        self.eventContinuation = eCont
-        self.invitationContinuation = iCont
-        self.session.delegate = self
+        session.delegate = self
     }
     
-    deinit {
-        eventContinuation?.finish()
-        invitationContinuation?.finish()
+    func startService() {
+        startAdvertising()
+        startBrowsing()
     }
     
-    // MARK: - Public API
+    func stopService() {
+        stopAdvertising()
+        stopBrowsing()
+    }
     
+    func invite(peer: MCPeerID) {
+    }
+    
+    func acceptInvitation(_ invitation: PendingInvitation) {
+    }
+    
+    func declineInvitation(_ invitation: PendingInvitation) {
+    }
+    
+    func send(text: String) {
+    }
+    
+    func disconnect() {
+    }
+}
+
+private extension DefaultMultiPeerService {
     func startAdvertising() {
+        Log.info("Starting advertising")
+//        guard !isAdvertising else { return }
         let adv = MCNearbyServiceAdvertiser(
             peer: myPeerID,
             discoveryInfo: nil,
-            serviceType: serviceType
+            serviceType: Constants.serviceType
         )
         adv.delegate = self
         adv.startAdvertisingPeer()
         self.advertiser = adv
+//        isAdvertising = true
+        Log.info("Started advertising as \(self.myPeerID.displayName)")
     }
     
     func stopAdvertising() {
+        Log.info("Stopping advertising")
         advertiser?.stopAdvertisingPeer()
         advertiser = nil
+//        isAdvertising = false
+        Log.info("Stopped advertising")
     }
     
     func startBrowsing() {
+        Log.info("Starting browsing")
+//        guard !isBrowsing else { return }
         let br = MCNearbyServiceBrowser(
             peer: myPeerID,
-            serviceType: serviceType
+            serviceType: Constants.serviceType
         )
         br.delegate = self
         br.startBrowsingForPeers()
         self.browser = br
+//        isBrowsing = true
+        Log.info("Started browsing")
     }
     
     func stopBrowsing() {
+        Log.info("Stopping browsing")
         browser?.stopBrowsingForPeers()
         browser = nil
-    }
-    
-    func invite(_ peer: PeerInfo, timeout: TimeInterval = 30) {
-        lock.lock()
-        let mcPeer = peerMap.first { $0.value == peer }?.key
-        lock.unlock()
-        
-        guard let mcPeer else { return }
-        browser?.invitePeer(mcPeer, to: session, withContext: nil, timeout: timeout)
-    }
-    
-    func send(_ data: Data, reliable: Bool = true) throws {
-        guard !session.connectedPeers.isEmpty else { return }
-        try session.send(
-            data,
-            toPeers: session.connectedPeers,
-            with: reliable ? .reliable : .unreliable
-        )
-    }
-    
-    func disconnect() {
-        session.disconnect()
-    }
-    
-    // MARK: - Internal helpers
-    
-    private func peerInfo(for mcPeer: MCPeerID) -> PeerInfo {
-        lock.lock()
-        defer { lock.unlock() }
-        
-        if let existing = peerMap[mcPeer] {
-            return existing
-        }
-        let info = PeerInfo(
-            id: mcPeer.displayName + "-" + UUID().uuidString.prefix(8),
-            displayName: mcPeer.displayName
-        )
-        peerMap[mcPeer] = info
-        return info
-    }
-    
-    private func emit(_ event: PeerEvent) {
-        eventContinuation?.yield(event)
+//        isBrowsing = false
+//        discoveredPeers.removeAll()
+        Log.info("Stopped browsing")
     }
 }
 
-// MARK: - MCSessionDelegate
-
-extension MultiPeerService: MCSessionDelegate {
-    
-    func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
-        let info = peerInfo(for: peerID)
-        switch state {
-        case .connected:    emit(.connected(info))
-        case .connecting:   emit(.connecting(info))
-        case .notConnected: emit(.disconnected(info))
-        @unknown default:   break
-        }
+extension DefaultMultiPeerService: MCSessionDelegate {
+    func session(
+        _ session: MCSession,
+        peer peerID: MCPeerID,
+        didChange state: MCSessionState
+    ) {
+        Log.debug("Session state \(state) didChange with peer: \(peerID)")
     }
     
-    func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        emit(.received(data, from: peerInfo(for: peerID)))
+    func session(
+        _ session: MCSession,
+        didReceive data: Data,
+        fromPeer peerID: MCPeerID
+    ) {
+        Log.debug("Session didReceive: \(data.count)bytes from: \(peerID)")
     }
     
-    func session(_ session: MCSession, didReceive stream: InputStream, withName: String, fromPeer: MCPeerID) {}
-    func session(_ session: MCSession, didStartReceivingResourceWithName: String, fromPeer: MCPeerID, with: Progress) {}
-    func session(_ session: MCSession, didFinishReceivingResourceWithName: String, fromPeer: MCPeerID, at: URL?, withError: Error?) {}
+    func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {
+        Log.debug("Session didReceiveStream withName: \(streamName) from: \(peerID)")
+    }
+    func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {
+        Log.debug("Session didStartReceivingResourceWithName withName: \(resourceName) from: \(peerID), progress: \(progress)")
+    }
+    func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?) {
+        Log.debug("Session didFinishReceivingResourceWithName withName: \(resourceName) from: \(peerID), localUrl: \(localURL) error: \(error)")
+    }
 }
 
-// MARK: - Browser delegate
-
-extension MultiPeerService: MCNearbyServiceBrowserDelegate {
-    
-    func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo: [String: String]?) {
-        emit(.discovered(peerInfo(for: peerID)))
-    }
-    
-    func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
-        emit(.lost(peerInfo(for: peerID)))
-    }
-    
-    func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {}
-}
-
-// MARK: - Advertiser delegate
-
-extension MultiPeerService: MCNearbyServiceAdvertiserDelegate {
-    
+extension DefaultMultiPeerService: MCNearbyServiceAdvertiserDelegate {
     func advertiser(
         _ advertiser: MCNearbyServiceAdvertiser,
         didReceiveInvitationFromPeer peerID: MCPeerID,
         withContext context: Data?,
         invitationHandler: @escaping (Bool, MCSession?) -> Void
     ) {
-        let info = peerInfo(for: peerID)
-        let session = self.session
-        
-        Task {
-            let accepted = await withCheckedContinuation { continuation in
-                let invitation = PeerInvitation(peer: info, continuation: continuation)
-                invitationContinuation?.yield(invitation)
-            }
-            invitationHandler(accepted, accepted ? session : nil)
-        }
+        Log.debug("Advertiser didReceiveInvitationFromPeer: \(peerID), context: \(context?.count) bytes")
     }
     
-    func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {}
+    func advertiser(
+        _ advertiser: MCNearbyServiceAdvertiser,
+        didNotStartAdvertisingPeer error: Error
+    ) {
+        Log.debug("Advertiser didNotStartAdvertisingPeer: \(error)")
+    }
 }
-*/
+
+extension DefaultMultiPeerService: MCNearbyServiceBrowserDelegate {
+    
+    func browser(
+        _ browser: MCNearbyServiceBrowser,
+        foundPeer peerID: MCPeerID,
+        withDiscoveryInfo info: [String: String]?
+    ) {
+        Log.debug("Browser found peer: \(peerID), info: \(String(describing: info))")
+    }
+    
+    func browser(
+        _ browser: MCNearbyServiceBrowser,
+        lostPeer peerID: MCPeerID
+    ) {
+        Log.debug("Browser lost peer: \(peerID)")
+    }
+    
+    func browser(
+        _ browser: MCNearbyServiceBrowser,
+        didNotStartBrowsingForPeers error: Error
+    ) {
+        Log.debug("Browser didNotStartBrowsingForPeers: \(error)")
+    }
+}

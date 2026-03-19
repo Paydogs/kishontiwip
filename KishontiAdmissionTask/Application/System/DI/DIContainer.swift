@@ -29,8 +29,13 @@ extension Container {
         .singleton
     }
 
-    var systemService: Factory<any SystemService> {
+    var systemService: Factory<SystemService> {
         Factory(self) { DefaultSystemService() }
+            .singleton
+    }
+    
+    var multiPeerService: Factory<MultiPeerService> {
+        Factory(self) { DefaultMultiPeerService() }
             .singleton
     }
 }

@@ -7,7 +7,6 @@
 
 enum AppAction: Intent {
     case setAdvertising(Bool)
-    case setBrowsing(Bool)
     case peerDiscovered(Peer)
     case peerLost(Peer)
     case peerConnected(Peer)

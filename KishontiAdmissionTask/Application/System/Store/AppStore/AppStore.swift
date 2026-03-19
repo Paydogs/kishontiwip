@@ -21,13 +21,23 @@ public final class AppStore: ActionHandler {
         await store.currentState()
     }
 
+    public func stream<A: Equatable>(_ kp1: KeyPath<AppState, A>) async -> AsyncStream<AppState> {
+        await store.stream(kp1)
+    }
+
+    public func stream<A: Equatable, B: Equatable>(_ kp1: KeyPath<AppState, A>, _ kp2: KeyPath<AppState, B>) async -> AsyncStream<AppState> {
+        await store.stream(kp1, kp2)
+    }
+
+    public func stream<A: Equatable, B: Equatable, C: Equatable>(_ kp1: KeyPath<AppState, A>, _ kp2: KeyPath<AppState, B>, _ kp3: KeyPath<AppState, C>) async -> AsyncStream<AppState> {
+        await store.stream(kp1, kp2, kp3)
+    }
+
     public func handleAction(_ action: any Intent) async {
         guard let action = action as? AppAction else { return }
         switch action {
         case .setAdvertising(let value):
             await store.update { $0.isAdvertising = value }
-        case .setBrowsing(let value):
-            await store.update { $0.isBrowsing = value }
         case .peerDiscovered(let peer):
             await store.update { $0.discoveredPeers[peer.peerId] = peer }
         case .peerLost(let peer):
