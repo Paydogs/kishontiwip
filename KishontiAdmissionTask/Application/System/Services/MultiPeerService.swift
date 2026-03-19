@@ -18,25 +18,29 @@ struct PendingInvitation: Identifiable {
 protocol MultiPeerService {
     func startService()
     func stopService()
-    func invite(peer: MCPeerID)
-    func acceptInvitation(_ invitation: PendingInvitation)
-    func declineInvitation(_ invitation: PendingInvitation)
+    func invite(peer: Peer)
+    func acceptInvitation()
+    func declineInvitation()
     func send(text: String)
-    func disconnect()
+    func disconnect(peer: Peer)
 }
 
 // MARK: - PeerService
 final class DefaultMultiPeerService: NSObject, MultiPeerService {
+    private let deviceManager: DeviceManaging
     private let myPeerID: MCPeerID
     private let session: MCSession
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
     
     var pendingInvitation: PendingInvitation?
+
+    private var discoveredPeerIDs: [String: MCPeerID] = [:]
+    private var isActive: Bool = false
     
-    override init() {
-        let displayName = UIDevice.current.name
-        self.myPeerID = MCPeerID(displayName: displayName)
+    init(deviceManager: DeviceManaging) {
+        self.deviceManager = deviceManager
+        self.myPeerID = MCPeerID(displayName: DeviceIdentity.peerName)
         self.session = MCSession(
             peer: myPeerID,
             securityIdentity: nil,
@@ -47,44 +51,68 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
     }
     
     func startService() {
+        guard !isActive else { return }
         startAdvertising()
         startBrowsing()
+        isActive = true
     }
     
     func stopService() {
+        guard isActive else { return }
         stopAdvertising()
         stopBrowsing()
+        isActive = false
+        for (name, peerID) in discoveredPeerIDs {
+            deviceManager.peerLost(Peer(peerId: name, name: peerID.displayName), via: .multipeer)
+        }
+        discoveredPeerIDs.removeAll()
     }
     
-    func invite(peer: MCPeerID) {
+    func invite(peer: Peer) {
+        guard let mcPeerID = discoveredPeerIDs[peer.peerId] else {
+            Log.debug("Invite failed: no MCPeerID for \(peer.name)")
+            return
+        }
+        browser?.invitePeer(mcPeerID, to: session, withContext: nil, timeout: 30)
+        Log.debug("Sent invitation to \(peer.name)")
     }
     
-    func acceptInvitation(_ invitation: PendingInvitation) {
+    func acceptInvitation() {
+        guard let invitation = pendingInvitation else { return }
+        invitation.handler(true, session)
+        pendingInvitation = nil
+        deviceManager.invitationCleared()
     }
-    
-    func declineInvitation(_ invitation: PendingInvitation) {
+
+    func declineInvitation() {
+        guard let invitation = pendingInvitation else { return }
+        invitation.handler(false, nil)
+        pendingInvitation = nil
+        deviceManager.invitationCleared()
     }
     
     func send(text: String) {
     }
     
-    func disconnect() {
+    func disconnect(peer: Peer) {
+        session.disconnect()
+        Log.debug("Disconnected \(peer.name)")
+        stopService()
+        startService()
     }
 }
 
 private extension DefaultMultiPeerService {
     func startAdvertising() {
         Log.info("Starting advertising")
-//        guard !isAdvertising else { return }
-        let adv = MCNearbyServiceAdvertiser(
+        let advertiser = MCNearbyServiceAdvertiser(
             peer: myPeerID,
             discoveryInfo: nil,
             serviceType: Constants.serviceType
         )
-        adv.delegate = self
-        adv.startAdvertisingPeer()
-        self.advertiser = adv
-//        isAdvertising = true
+        advertiser.delegate = self
+        advertiser.startAdvertisingPeer()
+        self.advertiser = advertiser
         Log.info("Started advertising as \(self.myPeerID.displayName)")
     }
     
@@ -92,13 +120,11 @@ private extension DefaultMultiPeerService {
         Log.info("Stopping advertising")
         advertiser?.stopAdvertisingPeer()
         advertiser = nil
-//        isAdvertising = false
         Log.info("Stopped advertising")
     }
     
     func startBrowsing() {
         Log.info("Starting browsing")
-//        guard !isBrowsing else { return }
         let br = MCNearbyServiceBrowser(
             peer: myPeerID,
             serviceType: Constants.serviceType
@@ -106,7 +132,6 @@ private extension DefaultMultiPeerService {
         br.delegate = self
         br.startBrowsingForPeers()
         self.browser = br
-//        isBrowsing = true
         Log.info("Started browsing")
     }
     
@@ -114,8 +139,6 @@ private extension DefaultMultiPeerService {
         Log.info("Stopping browsing")
         browser?.stopBrowsingForPeers()
         browser = nil
-//        isBrowsing = false
-//        discoveredPeers.removeAll()
         Log.info("Stopped browsing")
     }
 }
@@ -127,8 +150,19 @@ extension DefaultMultiPeerService: MCSessionDelegate {
         didChange state: MCSessionState
     ) {
         Log.debug("Session state \(state) didChange with peer: \(peerID)")
+        let peer = Peer(peerId: peerID.displayName, name: peerID.displayName)
+        switch state {
+        case .connected:
+            deviceManager.peerConnected(peer, via: .multipeer)
+        case .notConnected:
+            deviceManager.peerDisconnected(peer, via: .multipeer)
+            stopService()
+            startService()
+        default:
+            break
+        }
     }
-    
+
     func session(
         _ session: MCSession,
         didReceive data: Data,
@@ -144,7 +178,7 @@ extension DefaultMultiPeerService: MCSessionDelegate {
         Log.debug("Session didStartReceivingResourceWithName withName: \(resourceName) from: \(peerID), progress: \(progress)")
     }
     func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?) {
-        Log.debug("Session didFinishReceivingResourceWithName withName: \(resourceName) from: \(peerID), localUrl: \(localURL) error: \(error)")
+        Log.debug("Session didFinishReceivingResourceWithName withName: \(resourceName) from: \(peerID), localUrl: \(localURL?.absoluteString ?? "") error: \(error?.localizedDescription ?? "")")
     }
 }
 
@@ -155,9 +189,12 @@ extension DefaultMultiPeerService: MCNearbyServiceAdvertiserDelegate {
         withContext context: Data?,
         invitationHandler: @escaping (Bool, MCSession?) -> Void
     ) {
-        Log.debug("Advertiser didReceiveInvitationFromPeer: \(peerID), context: \(context?.count) bytes")
+        Log.debug("Advertiser didReceiveInvitationFromPeer: \(peerID), context: \(context?.count ?? 0) bytes")
+        pendingInvitation = PendingInvitation(peerID: peerID, handler: invitationHandler)
+        discoveredPeerIDs[peerID.displayName] = peerID
+        deviceManager.invitationReceived(from: Peer(peerId: peerID.displayName, name: peerID.displayName))
     }
-    
+
     func advertiser(
         _ advertiser: MCNearbyServiceAdvertiser,
         didNotStartAdvertisingPeer error: Error
@@ -167,22 +204,26 @@ extension DefaultMultiPeerService: MCNearbyServiceAdvertiserDelegate {
 }
 
 extension DefaultMultiPeerService: MCNearbyServiceBrowserDelegate {
-    
+
     func browser(
         _ browser: MCNearbyServiceBrowser,
         foundPeer peerID: MCPeerID,
         withDiscoveryInfo info: [String: String]?
     ) {
         Log.debug("Browser found peer: \(peerID), info: \(String(describing: info))")
+        discoveredPeerIDs[peerID.displayName] = peerID
+        deviceManager.peerDiscovered(Peer(peerId: peerID.displayName, name: peerID.displayName), via: .multipeer)
     }
-    
+
     func browser(
         _ browser: MCNearbyServiceBrowser,
         lostPeer peerID: MCPeerID
     ) {
         Log.debug("Browser lost peer: \(peerID)")
+        discoveredPeerIDs.removeValue(forKey: peerID.displayName)
+        deviceManager.peerLost(Peer(peerId: peerID.displayName, name: peerID.displayName), via: .multipeer)
     }
-    
+
     func browser(
         _ browser: MCNearbyServiceBrowser,
         didNotStartBrowsingForPeers error: Error

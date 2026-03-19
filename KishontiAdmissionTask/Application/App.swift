@@ -30,10 +30,10 @@ struct KishontiAdmissionTaskApp: App {
             Image(.kishonti)
         } rootContent: {
             RootView()
-
         } loadingTask: {
             await systemService.start()
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: .seconds(1))
+            dispatcher.dispatch(AppAction.resetStorage)
         }
         .environment(\.dispatcher, dispatcher)
     }

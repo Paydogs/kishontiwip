@@ -9,7 +9,7 @@ import FactoryKit
 
 extension Container {
     func preInit() {
-        _ = appStore()
+        _ = appActionHandler()
     }
 
     var actionBus: Factory<ActionBus> {
@@ -25,17 +25,32 @@ extension Container {
     var appStore: Factory<AppStore> {
         Factory(self) { AppStore(actionBus: self.actionBus(),
                                  persistence: UserDefaultsPersistence(key: "AppStore"),
-                                 initial: AppState.initialValue()) }
+                                 initialState: AppState()) }
         .singleton
     }
 
+    var appActionHandler: Factory<AppActionHandler> {
+        Factory(self) { AppActionHandler(actionBus: self.actionBus(), store: self.appStore()) }
+            .singleton
+    }
+
     var systemService: Factory<SystemService> {
-        Factory(self) { DefaultSystemService() }
+        Factory(self) { DefaultSystemService(actionBus: self.actionBus()) }
+            .singleton
+    }
+    
+    var deviceManager: Factory<DeviceManaging> {
+        Factory(self) { DefaultDeviceManager(dispatcher: self.actionDispatcher()) }
             .singleton
     }
     
     var multiPeerService: Factory<MultiPeerService> {
-        Factory(self) { DefaultMultiPeerService() }
+        Factory(self) { DefaultMultiPeerService(deviceManager: self.deviceManager()) }
+            .singleton
+    }
+    
+    var bluetoothService: Factory<BluetoothConnectivityService> {
+        Factory(self) { DefaultBluetoothConnectivityService(deviceManager: self.deviceManager()) }
             .singleton
     }
 }

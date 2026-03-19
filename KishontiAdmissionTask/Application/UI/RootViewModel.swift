@@ -12,9 +12,10 @@ final class RootViewModel: ObservableObject {
     private let store = Container.shared.appStore()
     private let dispatcher = Container.shared.actionDispatcher()
     
-    @Published private(set) var isAdvertising: Bool = false
+    @Published private(set) var isActive: Bool = false
     @Published private(set) var connectedPeers: [Peer] = []
     @Published private(set) var discoveredPeers: [Peer] = []
+    @Published private(set) var pendingInvitation: Peer? = nil
     @Published private(set) var messages: [NetworkEventLogItem] = []
     
     private var observationTask: Task<Void, Never>?
@@ -27,9 +28,10 @@ final class RootViewModel: ObservableObject {
                 // due to lack of @Observable
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    self.isAdvertising = state.isAdvertising
+                    self.isActive = state.isMultiPeerServiceActive
                     self.connectedPeers = Array(state.connectedPeers.values)
                     self.discoveredPeers = Array(state.discoveredPeers.values)
+                    self.pendingInvitation = state.pendingInvitation
                     self.messages = Array(state.messages.sorted { $0.date > $1.date }.prefix(20))
                 }
             }
@@ -40,14 +42,29 @@ final class RootViewModel: ObservableObject {
         observationTask?.cancel()
     }
     
-    func toggleAdvertising(_ active: Bool) {
-        dispatcher.dispatch(AppAction.setAdvertising(active))
-        
-        dispatcher.dispatch(AppAction.eventLogReceived(.init(
-            primaryText: "Your app",
-            secondaryText: active ? "started watching" : "stopped watching",
-            date: Date(),
-            severity: active ? .Good : .Error)
-        ))
+    func toggleServiceActivity() {
+        let action = AppAction.setMultiPeerServiceActive(!isActive)
+        dispatcher.dispatch(action)
+        dispatcher.dispatch(AppAction.createLogAction(from: action))
+    }
+    
+    func connect(peer: Peer) {
+        let action = DeviceAction.invite(peer)
+        dispatcher.dispatch(action)
+        dispatcher.dispatch(DeviceAction.createLogAction(from: action))
+    }
+    
+    func disconnect(peer: Peer) {
+        let action = DeviceAction.disconnect(peer)
+        dispatcher.dispatch(action)
+        dispatcher.dispatch(DeviceAction.createLogAction(from: action))
+    }
+
+    func acceptInvitation() {
+        dispatcher.dispatch(DeviceAction.acceptInvitation)
+    }
+
+    func declineInvitation() {
+        dispatcher.dispatch(DeviceAction.declineInvitation)
     }
 }

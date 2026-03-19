@@ -14,36 +14,67 @@ public protocol ActionSource {
 }
 public protocol ActionDispatching {
     func dispatch(_ action: any Intent)
+    func dispatchConcurrently(_ actions: any Intent...)
 }
 public protocol ActionHandler {
     func handleAction(_ action: any Intent) async
 }
 
 // MARK: Action bus for States
-public final class ActionBus: ActionSource, ActionDispatching {
+public final class ActionBus: ActionSource {
+    private let lock = NSLock()
     private var handlers: [ObjectIdentifier: any ActionHandler] = [:]
+    private let continuation: AsyncStream<any Intent>.Continuation
     
-    public func register<Action: Intent>(_ type: Action.Type, handler: ActionHandler) {
-        handlers[ObjectIdentifier(type)] = handler
+    public init() {
+        let (stream, continuation) = AsyncStream<any Intent>.makeStream()
+        self.continuation = continuation
+        Task { [weak self] in
+            for await action in stream {
+                guard let self else { return }
+                let key = ObjectIdentifier(Swift.type(of: action))
+                let handler = self.handlers[key]
+                await handler?.handleAction(action)
+            }
+        }
     }
     
-    public func dispatch(_ action: any Intent) {
-        let key = ObjectIdentifier(Swift.type(of: action))
+    public func register<Action: Intent>(_ type: Action.Type, handler: ActionHandler) {
+        lock.withLock { handlers[ObjectIdentifier(type)] = handler }
+    }
+    
+    internal func dispatch(_ action: any Intent) {
+        continuation.yield(action)
+    }
+    
+    internal func dispatchConcurrently(_ actions: [any Intent]) {
+        let snapshot = lock.withLock { handlers }
         Task {
-            await handlers[key]?.handleAction(action)
+            await withTaskGroup(of: Void.self) { group in
+                for action in actions {
+                    let key = ObjectIdentifier(Swift.type(of: action))
+                    if let handler = snapshot[key] {
+                        group.addTask { await handler.handleAction(action) }
+                    }
+                }
+            }
         }
     }
 }
 
-// MARK: Dispatching action
+// MARK: Provide only dispatching capability to the user
 final class ActionDispatcher: ObservableObject, ActionDispatching {
-    private let _dispatch: (any Intent) -> Void
+    private let actionBus: ActionBus
     
-    init(_ dispatcher: ActionDispatching) {
-        self._dispatch = dispatcher.dispatch
+    init(_ bus: ActionBus) {
+        self.actionBus = bus
     }
     
     func dispatch(_ action: any Intent) {
-        _dispatch(action)
+        actionBus.dispatch(action)
+    }
+    
+    func dispatchConcurrently(_ actions: any Intent...) {
+        actionBus.dispatchConcurrently(actions)
     }
 }

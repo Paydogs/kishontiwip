@@ -7,20 +7,27 @@
 
 import Foundation
 
+// MARK: Public Store interfaces
 public protocol StoreState: Sendable, Equatable, Codable {
     func needsPersistence(comparedTo previous: Self) -> Bool
 }
+
 public protocol StorableProperty: Codable, Hashable, Equatable, Sendable {}
 
 public protocol StoreProtocol: Actor {
     associatedtype StoreState: Sendable & Equatable
     
+    var currentState: StoreState { get }
+    
     func stateStream() -> AsyncStream<StoreState>
-    func currentState() -> StoreState
     func update(_ mutation: @Sendable (inout StoreState) -> Void)
 }
 
+// MARK: Public BaseStore implementation
 public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
+    public var currentState: State { _state }
+    public var subscriberCount: Int { subscribers.count }
+    
     private var _actionBus: ActionSource
     private var _persistence: (any StatePersisting<State>)?
     private var _state: State
@@ -46,6 +53,7 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
     }
 
     deinit {
+        saveTask?.cancel()
         for (_, subscriber) in subscribers {
             subscriber.finish()
         }
@@ -58,12 +66,12 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
             subscribers[subscriber] = continuation
             Log.debug("Subscriber count: \(subscribers.count)")
 
-            continuation.yield(_state)
-
             continuation.onTermination = { [weak self] _ in
                 Log.debug("Removing subscriber: \(subscriber)")
                 Task { await self?.removeSubscriber(subscriber) }
             }
+
+            continuation.yield(_state)
         }
     }
 
@@ -74,23 +82,21 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
         
         let oldState = _state
         _state = newState
-        for (_, s) in subscribers {
-            s.yield(_state)
+        for (_, subscriber) in subscribers {
+            subscriber.yield(_state)
         }
         if _persistence != nil, newState.needsPersistence(comparedTo: oldState) {
             debounceSave()
         }
     }
+}
 
-    public func currentState() -> State {
-        return _state
-    }
-    
-    public func save() async {
+private extension BaseStore {
+    func save() async {
         try? await _persistence?.save(_state)
     }
     
-    public func load() async throws {
+    func load() async throws {
         if let saved = try await _persistence?.load(), saved != _state {
             _state = saved
             for (_, s) in subscribers {
@@ -99,83 +105,23 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
         }
     }
     
-    public func clear() async throws {
+    func clear() async throws {
         try await _persistence?.clear()
     }
-        
-    private func debounceSave() {
+    
+    func debounceSave() {
         Log.debug("Saving...")
         saveTask?.cancel()
         saveTask = Task {
             try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled else { return }
             try? await _persistence?.save(_state)
-            Log.debug("Saved (?!)")
+            Log.debug("Saved...")
         }
     }
-}
-
-extension BaseStore {
-    fileprivate func removeSubscriber(_ id: UUID) {
+    
+    func removeSubscriber(_ id: UUID) {
         subscribers.removeValue(forKey: id)
-    }
-}
-
-public extension BaseStore {
-    func stream<A: Equatable>(
-        _ kp1: KeyPath<State, A>
-    ) -> AsyncStream<State> {
-        AsyncStream { continuation in
-            Task {
-                var prev: State? = nil
-                for await state in await self.stateStream() {
-                    defer { prev = state }
-                    guard let prev else { continuation.yield(state); continue }
-                    guard state[keyPath: kp1] != prev[keyPath: kp1] else { continue }
-                    continuation.yield(state)
-                }
-            }
-        }
-    }
-
-    func stream<A: Equatable, B: Equatable>(
-        _ kp1: KeyPath<State, A>,
-        _ kp2: KeyPath<State, B>
-    ) -> AsyncStream<State> {
-        AsyncStream { continuation in
-            Task {
-                var prev: State? = nil
-                for await state in await self.stateStream() {
-                    defer { prev = state }
-                    guard let prev else { continuation.yield(state); continue }
-                    guard state[keyPath: kp1] != prev[keyPath: kp1] ||
-                          state[keyPath: kp2] != prev[keyPath: kp2]
-                    else { continue }
-                    continuation.yield(state)
-                }
-            }
-        }
-    }
-
-    func stream<A: Equatable, B: Equatable, C: Equatable>(
-        _ kp1: KeyPath<State, A>,
-        _ kp2: KeyPath<State, B>,
-        _ kp3: KeyPath<State, C>
-    ) -> AsyncStream<State> {
-        AsyncStream { continuation in
-            Task {
-                var prev: State? = nil
-                for await state in await self.stateStream() {
-                    defer { prev = state }
-                    guard let prev else { continuation.yield(state); continue }
-                    guard state[keyPath: kp1] != prev[keyPath: kp1] ||
-                          state[keyPath: kp2] != prev[keyPath: kp2] ||
-                          state[keyPath: kp3] != prev[keyPath: kp3]
-                    else { continue }
-                    continuation.yield(state)
-                }
-            }
-        }
     }
 }
 

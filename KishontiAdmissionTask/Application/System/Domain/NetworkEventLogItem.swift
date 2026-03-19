@@ -24,7 +24,7 @@ public struct NetworkEventLogItem: StorableProperty, Identifiable {
 }
 
 public enum EventSeverity: StorableProperty {
-    case Good
-    case Warning
-    case Error
+    case info
+    case warning
+    case error
 }

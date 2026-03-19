@@ -1,3 +1,5 @@
-"app_name" = "Kishonti Admission Task";
 "language_code_en" = "English";
 "language_code_hu" = "Hungarian";
+
+"app_name" = "Admission Task";
+"service_toggle_title" = "Active";

@@ -5,11 +5,16 @@
 //  Created by Andras Olah on 2026. 03. 19..
 //
 
-enum AppAction: Intent {
-    case setAdvertising(Bool)
+public enum AppAction: Intent {
+    case setMultiPeerServiceActive(Bool)
+    case setBluetoothServiceActive(Bool)
     case peerDiscovered(Peer)
+    case peerUpdated(Peer)
     case peerLost(Peer)
     case peerConnected(Peer)
     case peerDisconnected(Peer)
-    case eventLogReceived(NetworkEventLogItem)
+    case invitationReceived(Peer)
+    case invitationCleared
+    case addToEventLog(NetworkEventLogItem)
+    case resetStorage
 }

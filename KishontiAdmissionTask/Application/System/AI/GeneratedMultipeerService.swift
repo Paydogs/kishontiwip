@@ -239,7 +239,7 @@ extension GeneratedMultipeerService: MCNearbyServiceAdvertiserDelegate {
 // MARK: - MCNearbyServiceBrowserDelegate
 
 extension GeneratedMultipeerService: MCNearbyServiceBrowserDelegate {
-    
+    // OK
     func browser(
         _ browser: MCNearbyServiceBrowser,
         foundPeer peerID: MCPeerID,
@@ -254,6 +254,7 @@ extension GeneratedMultipeerService: MCNearbyServiceBrowserDelegate {
         }
     }
     
+    // OK
     func browser(
         _ browser: MCNearbyServiceBrowser,
         lostPeer peerID: MCPeerID
@@ -263,6 +264,7 @@ extension GeneratedMultipeerService: MCNearbyServiceBrowserDelegate {
         }
     }
     
+    // Skip
     func browser(
         _ browser: MCNearbyServiceBrowser,
         didNotStartBrowsingForPeers error: Error

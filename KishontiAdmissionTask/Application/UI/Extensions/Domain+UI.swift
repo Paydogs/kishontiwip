@@ -13,11 +13,11 @@ extension NetworkEventLogItem {
 extension EventSeverity {
     var color: Color {
         switch self {
-        case .Good:
+        case .info:
             Asset.Colors.General.green.swiftUIColor
-        case .Warning:
+        case .warning:
             Asset.Colors.General.yellow.swiftUIColor
-        case .Error:
+        case .error:
             Asset.Colors.General.red.swiftUIColor
         }
     }

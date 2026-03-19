@@ -1,3 +1,5 @@
-"app_name" = "Kishonti Admission Task";
 "language_code_en" = "Angol";
 "language_code_hu" = "Magyar";
+
+"app_name" = "Interjú feladat";
+"service_toggle_title" = "Aktív";

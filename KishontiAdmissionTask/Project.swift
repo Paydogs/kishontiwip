@@ -17,13 +17,18 @@ let defaultApp = Target.target(
             "NSBonjourServices": .array([
                 "_peer-connect._tcp",
                 "_peer-connect._udp"
-            ])
+            ]),
+            "NSBluetoothAlwaysUsageDescription": "PeerConnect uses Bluetooth to maintain connections with nearby devices in the background.",
+            "UIBackgroundModes": .array(["bluetooth-central", "bluetooth-peripheral"])
         ]
     ),
     sources: [
         .glob("Application/**/*.swift", excluding: ["Application/Tests/**"])
     ],
     resources: ["Application/Resources/**"],
+//    entitlements: .dictionary([
+//        "com.apple.developer.device-information.user-assigned-device-name": true
+//    ]),
     dependencies: [
         .external(name: "FactoryKit"),
         .external(name: "Logging")
@@ -47,26 +52,18 @@ let unitTests = Target.target(
     sources: ["Application/Tests/UnitTests/**"],
     dependencies: [
         .target(name: "KishontiAdmissionTask") // Access app code via @testable import
-    ]
-)
-
-// 3. The UI Test Target
-let uiTests = Target.target(
-    name: "KishontiAdmissionTaskUITests",
-    destinations: [.iPhone],
-    product: .uiTests,
-    bundleId: "com.magnificat.olahandrasadmissionUITests",
-    deploymentTargets: .iOS("16.0"),
-    infoPlist: .default,
-    sources: ["Application/Tests/UITests/**"],
-    dependencies: [
-        .target(name: "KishontiAdmissionTask")
-    ]
+    ],
+    settings: .settings(
+        base: [
+            "DEVELOPMENT_TEAM": "64GU57DP44",
+            "CODE_SIGN_STYLE": "Automatic"
+        ]
+    )
 )
 
 let project = Project(
     name: "KishontiAdmissionTask",
-    targets: [defaultApp, unitTests, uiTests],
+    targets: [defaultApp, unitTests],
     resourceSynthesizers: [
         .assets(),
         .strings(),
