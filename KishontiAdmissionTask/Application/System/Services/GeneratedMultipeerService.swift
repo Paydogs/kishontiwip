@@ -11,7 +11,7 @@ import os
 
 // MARK: - PeerService
 
-final class MultipeerService: NSObject, ObservableObject {
+final class GeneratedMultipeerService: NSObject, ObservableObject {
     
     // MARK: - Configuration
     
@@ -161,7 +161,7 @@ final class MultipeerService: NSObject, ObservableObject {
 
 // MARK: - MCSessionDelegate
 
-extension MultipeerService: MCSessionDelegate {
+extension GeneratedMultipeerService: MCSessionDelegate {
     
     func session(
         _ session: MCSession,
@@ -208,7 +208,7 @@ extension MultipeerService: MCSessionDelegate {
 
 // MARK: - MCNearbyServiceAdvertiserDelegate
 
-extension MultipeerService: MCNearbyServiceAdvertiserDelegate {
+extension GeneratedMultipeerService: MCNearbyServiceAdvertiserDelegate {
     
     func advertiser(
         _ advertiser: MCNearbyServiceAdvertiser,
@@ -238,7 +238,7 @@ extension MultipeerService: MCNearbyServiceAdvertiserDelegate {
 
 // MARK: - MCNearbyServiceBrowserDelegate
 
-extension MultipeerService: MCNearbyServiceBrowserDelegate {
+extension GeneratedMultipeerService: MCNearbyServiceBrowserDelegate {
     
     func browser(
         _ browser: MCNearbyServiceBrowser,

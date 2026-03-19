@@ -41,7 +41,7 @@ fileprivate struct LaunchScreenModifier<Logo: View>: ViewModifier {
                           checkStates(windowScene.activationState),
                           !windowScene.windows.contains(where: { $0.tag == 9999 })
                     else {
-                        print("SplashWindow already added")
+                        Log.warn("SplashWindow already added")
                         continue
                     }
                     
@@ -58,7 +58,7 @@ fileprivate struct LaunchScreenModifier<Logo: View>: ViewModifier {
                     window.rootViewController = animationRootViewController
                     
                     self.splashWindow = window
-                    print("SplashWindow added")
+                    Log.debug("SplashWindow added")
                 }
             }
     }

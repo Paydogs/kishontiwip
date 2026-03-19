@@ -7,11 +7,8 @@ import PackageDescription
 
     let packageSettings = PackageSettings(
         productTypes: [
-            "Alamofire": .framework,
-            "Lottie": .framework,
-            "Swinject": .framework,
-            "Logging": .framework,
-            "Toolkit": .framework,
+            "FactoryKit": .framework,
+            "Logging": .framework
         ],
         baseSettings: .settings(configurations: [
             .debug(name: "Debug"),
@@ -24,12 +21,8 @@ import PackageDescription
 let package = Package(
     name: "Dependencies",
     dependencies: [
-        .package(url: "https://github.com/Alamofire/Alamofire", from: "5.0.0"),
-        .package(url: "https://github.com/airbnb/lottie-spm", from: "4.5.2"),
-        .package(url: "https://github.com/Swinject/Swinject", from: "2.10.0"),
-        .package(url: "https://github.com/Apple/swift-log", from: "1.8.0"),
-        .package(url: "https://github.com/paydogs/Toolkit", from: "0.1.0"),
-        // .package(path: "../../../Training/Toolkit")
+        .package(url: "https://github.com/hmlongco/Factory.git", from: "2.5.3"),
+        .package(url: "https://github.com/Apple/swift-log", from: "1.8.0")
     ],
     targets: [
     ]

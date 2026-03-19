@@ -13,6 +13,11 @@ let defaultApp = Target.target(
                 "UIColorName": "",
                 "UIImageName": "",
             ],
+            "NSLocalNetworkUsageDescription": "PeerConnect uses your local network to discover nearby devices.",
+            "NSBonjourServices": .array([
+                "_peer-connect._tcp",
+                "_peer-connect._udp"
+            ])
         ]
     ),
     sources: [
@@ -20,10 +25,7 @@ let defaultApp = Target.target(
     ],
     resources: ["Application/Resources/**"],
     dependencies: [
-        .external(name: "Alamofire"),
-        .external(name: "Lottie"),
-        .external(name: "Toolkit"),
-        .external(name: "Swinject"),
+        .external(name: "FactoryKit"),
         .external(name: "Logging")
     ],
     settings: .settings(

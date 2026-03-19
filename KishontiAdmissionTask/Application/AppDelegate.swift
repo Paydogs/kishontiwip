@@ -2,7 +2,7 @@
 //  AppDelegate.swift
 //  KishontiAdmissionTask
 //
-//  Created by Andras Olah on 2026. 03. 20..
+//  Created by Andras Olah on 2026. 03. 18..
 //
 
 import UIKit
@@ -14,6 +14,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         print("didFinishLaunchingWithOptions")
+        
+        AppleLoggerAdapter.bootstrapStandardOutputWithLogLevel(level: .trace)
+        Log.install(AppleLoggerAdapter())
+        
         return true
     }
 

@@ -7,14 +7,23 @@
 
 import Foundation
 
-struct NetworkEventLogItem {
-    let primaryText: String
-    let secondaryText: String
-    let date: Date
-    let severity: EventSeverity
+public struct NetworkEventLogItem: StorableProperty, Identifiable {
+    public let id: UUID
+    public let primaryText: String
+    public let secondaryText: String
+    public let date: Date
+    public let severity: EventSeverity
+    
+    public init(primaryText: String, secondaryText: String, date: Date, severity: EventSeverity) {
+        self.id = UUID()
+        self.primaryText = primaryText
+        self.secondaryText = secondaryText
+        self.date = date
+        self.severity = severity
+    }
 }
 
-enum EventSeverity {
+public enum EventSeverity: StorableProperty {
     case Good
     case Warning
     case Error
