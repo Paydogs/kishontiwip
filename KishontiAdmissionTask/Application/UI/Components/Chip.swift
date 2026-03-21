@@ -8,24 +8,28 @@
 import SwiftUI
 
 struct Chip: View {
-    let text: String
-    let color: Color
+    struct Data: Identifiable {
+        let id = UUID()
+        let text: String
+        let color: Color
+    }
+    let chipData: Data
     
     var body: some View {
-        Text(text)
+        Text(chipData.text)
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
             .textCase(.uppercase)
-            .foregroundColor(color)
+            .foregroundColor(chipData.color)
             .padding(.horizontal, 12)
             .frame(height: 28)
             .background(
                 Capsule()
-                    .fill(color.opacity(0.12))
+                    .fill(chipData.color.opacity(0.12))
             )
     }
 }
 
 #Preview {
-    Chip(text: "Live", color: Asset.Colors.General.green.swiftUIColor)
-    Chip(text: "Error", color: Asset.Colors.General.red.swiftUIColor)
+    Chip(chipData: .init(text: "Live", color: Asset.Colors.General.green.swiftUIColor))
+    Chip(chipData: .init(text: "Error", color: Asset.Colors.General.red.swiftUIColor))
 }

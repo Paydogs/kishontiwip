@@ -33,7 +33,6 @@ struct KishontiAdmissionTaskApp: App {
         } loadingTask: {
             await systemService.start()
             try? await Task.sleep(for: .seconds(1))
-            dispatcher.dispatch(AppAction.resetStorage)
         }
         .environment(\.dispatcher, dispatcher)
     }

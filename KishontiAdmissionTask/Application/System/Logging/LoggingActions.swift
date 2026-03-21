@@ -10,28 +10,32 @@ import Foundation
 extension AppAction {
     static func createLogAction(from action: AppAction) -> AppAction {
         switch action {
-        case .setMultiPeerServiceActive(let bool):
-            return .addToEventLog(NetworkEventLogItem(primaryText: "Your app", secondaryText: "\(bool ? "started" : "stopped") watching on MultiPeer service", date: Date(), severity: bool ? .info : .error))
-        case .setBluetoothServiceActive(let bool):
-            return .addToEventLog(NetworkEventLogItem(primaryText: "Your app", secondaryText: "\(bool ? "started" : "stopped") watching on Bluetooth service", date: Date(), severity: bool ? .info : .error))
-        case .peerDiscovered(let peer):
-            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "discovered (\(peer.transportLabel))", date: Date(), severity: .info))
-        case .peerLost(let peer):
+        case .setServiceActive(let bool):
+            return .addToEventLog(NetworkEventLogItem(primaryText: "Your app", secondaryText: "\(bool ? "started" : "stopped") services", date: Date(), severity: bool ? .info : .error))
+        case .transportDiscovered(let peer, let transport):
+            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "discovered (\(transport.rawValue))", date: Date(), severity: .info))
+        case .transportLost(let peer, _):
             return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "lost", date: Date(), severity: .error))
-        case .peerConnected(let peer):
-            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "connected", date: Date(), severity: .info))
-        case .peerDisconnected(let peer):
-            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "disconnected", date: Date(), severity: .error))
+        case .peerConnected(let peer, let transport):
+            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "connected (\(transport.rawValue))", date: Date(), severity: .info))
+        case .peerDisconnected(let peer, let transport):
+            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "disconnected (\(transport.rawValue))", date: Date(), severity: .error))
         case .addToEventLog(_):
             return action
-        case .peerUpdated(let peer):
-            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "updated (\(peer.transportLabel))", date: Date(), severity: .info))
         case .invitationReceived(let peer):
             return .addToEventLog(NetworkEventLogItem(primaryText: "Recieved invitation from \(peer.name)", secondaryText: "", date: Date(), severity: .info))
         case .invitationCleared:
             return .addToEventLog(NetworkEventLogItem(primaryText: "Invitation cleared", secondaryText: "", date: Date(), severity: .info))
+        case .setHeartbeatInterval(let interval):
+            return .addToEventLog(NetworkEventLogItem(primaryText: "Heartbeat interval", secondaryText: "\(Int(interval))s", date: Date(), severity: .info))
+        case .setHeartbeatRetentionHours(let hours):
+            return .addToEventLog(NetworkEventLogItem(primaryText: "Heartbeat retention", secondaryText: "\(hours)h", date: Date(), severity: .info))
+        case .heartbeatDetected:
+            return action
         case .resetStorage:
             return .addToEventLog(NetworkEventLogItem(primaryText: "Reseting store", secondaryText: "", date: Date(), severity: .error))
+        case .resetLog:
+            return .addToEventLog(NetworkEventLogItem(primaryText: "Clearing logs", secondaryText: "", date: Date(), severity: .error))
         }
     }
 }

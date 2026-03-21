@@ -10,6 +10,7 @@ import Foundation
 protocol BluetoothConnectivityService {
     func startService()
     func stopService()
+    func setHeartbeatInterval(_ interval: TimeInterval)
 }
 
 // MARK: - PeerService
@@ -34,5 +35,9 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
         Log.debug("Stopping Bluetooth service")
 
         Log.debug("Bluetooth service stopped")
+    }
+
+    func setHeartbeatInterval(_ interval: TimeInterval) {
+        // BT heartbeat handled by GeneratedBluetoothConnectivityService ping loop
     }
 }

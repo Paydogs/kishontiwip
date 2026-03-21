@@ -35,3 +35,32 @@ extension ConnectionStatus {
         }
     }
 }
+
+
+extension Set where Element == Transport {
+    var sorted: [Transport] {
+        self.sorted(by: { $0.rawValue < $1.rawValue })
+    }
+    
+    func transportChips() -> [Chip.Data] {
+        self.map { transport in
+            switch transport {
+            case .bluetooth:
+                return .init(text: "Bluetooth", color: Asset.Colors.General.blue.swiftUIColor)
+            case .multipeer:
+                return .init(text: "MultiPeer", color: Asset.Colors.General.red.swiftUIColor)
+            }
+        }
+    }
+}
+
+extension Array where Element == Transport {
+    var stringList: [String] {
+        self.map { transport in
+            switch transport {
+            case .bluetooth: return "Bluetooth"
+            case .multipeer: return "MultiPeer"
+            }
+        }
+    }
+}

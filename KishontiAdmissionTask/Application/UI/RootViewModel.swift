@@ -17,6 +17,7 @@ final class RootViewModel: ObservableObject {
     @Published private(set) var discoveredPeers: [Peer] = []
     @Published private(set) var pendingInvitation: Peer? = nil
     @Published private(set) var messages: [NetworkEventLogItem] = []
+    @Published private(set) var heartbeats: [PeerIdentifier: [PeerHeartbeat]] = [:]
     
     private var observationTask: Task<Void, Never>?
     
@@ -28,11 +29,12 @@ final class RootViewModel: ObservableObject {
                 // due to lack of @Observable
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    self.isActive = state.isMultiPeerServiceActive
                     self.connectedPeers = Array(state.connectedPeers.values)
+                    self.isActive = state.isServiceActive
                     self.discoveredPeers = Array(state.discoveredPeers.values)
                     self.pendingInvitation = state.pendingInvitation
                     self.messages = Array(state.messages.sorted { $0.date > $1.date }.prefix(20))
+                    self.heartbeats = state.heartbeats
                 }
             }
         }
@@ -42,8 +44,12 @@ final class RootViewModel: ObservableObject {
         observationTask?.cancel()
     }
     
+    func heartbeats(for peer: Peer) -> [PeerHeartbeat] {
+        heartbeats[peer.peerId] ?? []
+    }
+
     func toggleServiceActivity() {
-        let action = AppAction.setMultiPeerServiceActive(!isActive)
+        let action = AppAction.setServiceActive(!isActive)
         dispatcher.dispatch(action)
         dispatcher.dispatch(AppAction.createLogAction(from: action))
     }
@@ -66,5 +72,13 @@ final class RootViewModel: ObservableObject {
 
     func declineInvitation() {
         dispatcher.dispatch(DeviceAction.declineInvitation)
+    }
+    
+    func resetLog() {
+        dispatcher.dispatch(AppAction.resetLog)
+    }
+
+    func resetStorage() {
+        dispatcher.dispatch(AppAction.resetStorage)
     }
 }

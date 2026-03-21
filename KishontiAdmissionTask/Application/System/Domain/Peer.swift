@@ -31,17 +31,3 @@ public struct Peer: StorableProperty, Identifiable {
         activeTransports = []
     }
 }
-
-extension Peer {
-    var transportLabel: String {
-        activeTransports
-            .sorted(by: { $0.rawValue < $1.rawValue })
-            .map { transport in
-                switch transport {
-                case .bluetooth: return "Bluetooth"
-                case .multipeer: return "MultiPeer"
-                }
-            }
-            .joined(separator: ", ")
-    }
-}

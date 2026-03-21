@@ -19,18 +19,21 @@ actor DefaultSystemService: SystemService {
     private let bluetoothService = Container.shared.bluetoothService()
     
     private var observationTask: Task<Void, Never>?
-    
+    private var heartbeatObservationTask: Task<Void, Never>?
+
     public init(actionBus: ActionSource) {
         actionBus.register(DeviceAction.self, handler: self)
     }
-    
+
     func start() {
         Log.debug("SystemService started")
         listenStoreChanges()
+        listenHeartbeatInterval()
     }
     
     deinit {
         observationTask?.cancel()
+        heartbeatObservationTask?.cancel()
     }
 }
 
@@ -51,14 +54,26 @@ extension DefaultSystemService: ActionHandler {
 }
 
 private extension DefaultSystemService {
+    func listenHeartbeatInterval() {
+        heartbeatObservationTask?.cancel()
+        heartbeatObservationTask = Task {
+            let stream = await store.stream(\.heartbeatInterval)
+            for await state in stream {
+                guard state.isServiceActive else { continue }
+                multiPeerService.setHeartbeatInterval(state.heartbeatInterval)
+                bluetoothService.setHeartbeatInterval(state.heartbeatInterval)
+            }
+        }
+    }
+
     func listenStoreChanges() {
         Log.debug("listenServerStatus started")
         observationTask?.cancel()
         observationTask = Task {
-            let stream = await store.stream(\.isMultiPeerServiceActive, \.isBluetoothServiceActive)
+            let stream = await store.stream(\.isServiceActive)
             for await state in stream {
                 Log.debug("State Changed (SystemService)")
-                if state.isMultiPeerServiceActive {
+                if state.isServiceActive {
                     multiPeerService.startService()
                     bluetoothService.startService()
                 } else {

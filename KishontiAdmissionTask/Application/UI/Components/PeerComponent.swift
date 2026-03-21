@@ -17,12 +17,12 @@ extension PeerComponent {
 
 struct PeerComponent: View {
     let text: String
-    let chipText: String?
-    let chipColor: Color?
+    let chips: [Chip.Data]
     let image: Image
     let isOn: Bool
+    let heartbeats: [PeerHeartbeat]
     let toggle: () -> Void
-    
+
     var body: some View {
         VStack {
             HStack(alignment: .top) {
@@ -42,18 +42,30 @@ struct PeerComponent: View {
                     Text(text)
                         .font(Fonts.regular(size: 16))
                         .foregroundColor(Asset.Colors.Text.primary.swiftUIColor)
-                    if let chipText = chipText, let chipcolor = chipColor {
-                        Chip(text: chipText, color: chipcolor)
+                    FlowLayout(spacing: 6) {
+                        ForEach(chips) { chipData in
+                            Chip(chipData: chipData)
+                        }
                     }
                 }
                 .padding(.leading, 8)
-                
+
                 Spacer()
                 GlowButton(image: image,
                            isOn: isOn,
                            action: toggle)
             }
-            .padding()
+            .padding([.horizontal, .top])
+
+            if !heartbeats.isEmpty {
+                HStack(spacing: 8) {
+                    ValueCard(value: "\(heartbeats.count)",
+                              valueColor: Asset.Colors.General.green.swiftUIColor,
+                              title: "HEARTBEATS")
+                    Spacer()
+                }
+                .padding([.horizontal, .bottom])
+            }
         }
         .background(Asset.Colors.Background.bg2.swiftUIColor)
         .cornerRadius(12)
@@ -62,24 +74,29 @@ struct PeerComponent: View {
 
 #Preview {
     PeerComponent(text: "iPhone 12 mini",
-                  chipText: "Own",
-                  chipColor: Asset.Colors.Text.primary.swiftUIColor,
+                  chips: [.init(text: "Own", color: Asset.Colors.Text.primary.swiftUIColor),
+                          .init(text: "BT", color: Asset.Colors.General.blue.swiftUIColor),
+                          .init(text: "MultiPoint", color: Asset.Colors.General.yellow.swiftUIColor),
+                          .init(text: "MultiLine test", color: Asset.Colors.General.yellow.swiftUIColor)],
                   image: Image.init(systemName: "power"),
                   isOn: false,
+                  heartbeats: [.bluetooth(Date()), .multipeer(Date()), .bluetooth(Date())],
                   toggle: { })
     .padding()
+
     PeerComponent(text: "iPhone 12 mini",
-                  chipText: "Detected",
-                  chipColor: Asset.Colors.General.yellow.swiftUIColor,
+                  chips: [.init(text: "Detected", color: Asset.Colors.General.yellow.swiftUIColor)],
                   image: Image.init(systemName: "link"),
                   isOn: false,
+                  heartbeats: [],
                   toggle: { })
     .padding()
+
     PeerComponent(text: "iPhone 12 mini",
-                  chipText: "Connected",
-                  chipColor: Asset.Colors.General.green.swiftUIColor,
+                  chips: [.init(text: "Connected", color: Asset.Colors.General.green.swiftUIColor)],
                   image: Image.init(systemName: "link"),
                   isOn: true,
+                  heartbeats: [.multipeer(Date())],
                   toggle: { })
     .padding()
 }
