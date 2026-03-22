@@ -110,13 +110,12 @@ private extension BaseStore {
     }
     
     func debounceSave() {
-        Log.debug("Saving...")
         saveTask?.cancel()
         saveTask = Task {
             try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled else { return }
             try? await _persistence?.save(_state)
-            Log.debug("Saved...")
+            Log.debug("Changes saved...")
         }
     }
     

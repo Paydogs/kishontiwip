@@ -18,7 +18,7 @@ struct PendingInvitation: Identifiable {
 protocol MultiPeerService {
     func startService()
     func stopService()
-    func setHeartbeatInterval(_ interval: TimeInterval)
+    func sendHeartbeats()
     func invite(peer: Peer)
     func acceptInvitation()
     func declineInvitation()
@@ -38,7 +38,6 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
 
     private var discoveredPeerIDs: [String: MCPeerID] = [:]
     private var isActive: Bool = false
-    private var heartbeatTask: Task<Void, Never>?
     
     init(deviceManager: DeviceManaging) {
         self.deviceManager = deviceManager
@@ -64,8 +63,6 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
         stopAdvertising()
         stopBrowsing()
         isActive = false
-        heartbeatTask?.cancel()
-        heartbeatTask = nil
         for (name, peerID) in discoveredPeerIDs {
             deviceManager.peerLost(Peer(peerId: name, name: peerID.displayName), via: .multipeer)
         }
@@ -95,16 +92,8 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
         deviceManager.invitationCleared()
     }
     
-    func setHeartbeatInterval(_ interval: TimeInterval) {
-        heartbeatTask?.cancel()
-        guard interval > 0 else { return }
-        heartbeatTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(interval))
-                guard !Task.isCancelled else { return }
-                self?.reportHeartbeats()
-            }
-        }
+    func sendHeartbeats() {
+        reportHeartbeats()
     }
 
     func send(text: String) {

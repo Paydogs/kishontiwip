@@ -60,12 +60,7 @@ public final class AppActionHandler: ActionHandler {
             await store.update { state in
                 guard var existing = state.connectedPeers[peer.peerId] else { return }
                 existing.activeTransports.remove(transport)
-                if existing.activeTransports.isEmpty {
-                    state.connectedPeers.removeValue(forKey: peer.peerId)
-                    state.discoveredPeers.removeValue(forKey: peer.peerId)
-                } else {
-                    state.connectedPeers[peer.peerId] = existing
-                }
+                state.connectedPeers[peer.peerId] = existing
             }
         case .invitationReceived(let peer):
             await store.update { $0.pendingInvitation = peer }

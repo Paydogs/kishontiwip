@@ -14,8 +14,8 @@ extension AppAction {
             return .addToEventLog(NetworkEventLogItem(primaryText: "Your app", secondaryText: "\(bool ? "started" : "stopped") services", date: Date(), severity: bool ? .info : .error))
         case .transportDiscovered(let peer, let transport):
             return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "discovered (\(transport.rawValue))", date: Date(), severity: .info))
-        case .transportLost(let peer, _):
-            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "lost", date: Date(), severity: .error))
+        case .transportLost(let peer, let transport):
+            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "lost (\(transport.rawValue))", date: Date(), severity: .error))
         case .peerConnected(let peer, let transport):
             return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "connected (\(transport.rawValue))", date: Date(), severity: .info))
         case .peerDisconnected(let peer, let transport):

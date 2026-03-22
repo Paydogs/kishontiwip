@@ -24,7 +24,7 @@ struct PeerComponent: View {
     let toggle: () -> Void
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             HStack(alignment: .top) {
                 Image(systemName: "iphone")
                     .font(.system(size: 20))
@@ -55,13 +55,18 @@ struct PeerComponent: View {
                            isOn: isOn,
                            action: toggle)
             }
-            .padding([.horizontal, .top])
+            .padding()
 
             if !heartbeats.isEmpty {
+                let btCount = heartbeats.filter { $0.transport == .bluetooth }.count
+                let mpCount = heartbeats.filter { $0.transport == .multipeer }.count
                 HStack(spacing: 8) {
-                    ValueCard(value: "\(heartbeats.count)",
-                              valueColor: Asset.Colors.General.green.swiftUIColor,
-                              title: "HEARTBEATS")
+                    ValueCard(value: "\(btCount)",
+                              valueColor: btCount > 0 ? Asset.Colors.General.blue.swiftUIColor : Asset.Colors.Text.secondary.swiftUIColor,
+                              title: "BT")
+                    ValueCard(value: "\(mpCount)",
+                              valueColor: mpCount > 0 ? Asset.Colors.General.green.swiftUIColor : Asset.Colors.Text.secondary.swiftUIColor,
+                              title: "MP")
                     Spacer()
                 }
                 .padding([.horizontal, .bottom])
