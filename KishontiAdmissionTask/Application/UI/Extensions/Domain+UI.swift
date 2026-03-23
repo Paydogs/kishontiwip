@@ -26,12 +26,64 @@ extension EventSeverity {
 extension ConnectionStatus {
     var color: Color {
         switch self {
-        case .unknown:
+        case .unavailable:
             Asset.Colors.General.gray.swiftUIColor
-        case .online:
+        case .full:
             Asset.Colors.General.green.swiftUIColor
-        case .offline:
-            Asset.Colors.General.red.swiftUIColor
+        case .bluetooth:
+            Asset.Colors.General.blue.swiftUIColor
+        case .multipeer:
+            Asset.Colors.General.yellow.swiftUIColor
+        }
+    }
+}
+
+extension Array where Element == ConnectionStatus {
+    var globalPercentageText: String {
+        guard !self.isEmpty else { return "0.00%" }
+        let availableCount = self.filter { $0 != .unavailable }.count
+        let percentage = CGFloat(availableCount) / CGFloat(self.count)
+        return String(format: "%.2f%%", percentage * 100)
+    }
+    
+    func percentageText(_ connectionStatus: ConnectionStatus) -> String {
+        guard !self.isEmpty else { return "0.00%" }
+        let availableCount = self.filter { $0 == connectionStatus }.count
+        let percentage = CGFloat(availableCount) / CGFloat(self.count)
+        return String(format: "%.2f%%", percentage * 100)
+    }
+}
+
+extension Array where Element == PeerHeartbeat {
+    func connectionStatuses(slice: TimeInterval) -> [ConnectionStatus] {
+        guard !self.isEmpty, slice > 0 else { return [] }
+        
+        // Slice the array into slice length buckets
+        let timeSliced = Dictionary(grouping: self) { heartbeat in
+            let seconds = heartbeat.date.timeIntervalSince1970
+            return (seconds / slice).rounded(.towardZero) * slice
+        }
+        
+        let sortedKeys = timeSliced.keys.sorted()
+        
+        return sortedKeys.map { key in
+            let heartbeatsInSlice = timeSliced[key] ?? []
+            
+            // Extract unique transports present in this slice
+            let transports = heartbeatsInSlice.compactMap { $0.transport }
+            
+            let hasBT = transports.contains(.bluetooth)
+            let hasMP = transports.contains(.multipeer)
+            
+            if hasBT && hasMP {
+                return .full
+            } else if hasBT {
+                return .bluetooth
+            } else if hasMP {
+                return .multipeer
+            } else {
+                return .unavailable
+            }
         }
     }
 }

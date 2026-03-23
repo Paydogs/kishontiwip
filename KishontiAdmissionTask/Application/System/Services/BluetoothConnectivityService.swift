@@ -9,10 +9,19 @@ import Foundation
 import CoreBluetooth
 
 protocol BluetoothConnectivityService {
+    /// Initializes the `CBCentralManager` and `CBPeripheralManager`, begins scanning and advertising.
     func startService()
+
+    /// Stops scanning/advertising, cancels all peripheral connections, and clears internal state.
     func stopService()
+
+    /// Notifies the device manager of a heartbeat for each connected peer and pushes the local peer name via the notify characteristic.
     func sendHeartbeats()
+
+    /// Cancels the BLE connection to `peer` and removes it from the paired set, preventing auto-reconnect.
     func disconnect(peer: Peer)
+
+    /// Marks `peer` as paired and immediately connects if its peripheral has already been resolved.
     func reconnectKnownPeer(peer: Peer)
 }
 
@@ -31,6 +40,8 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
     private var resolvedPeripherals: [String: CBPeripheral] = [:]
     /// Reverse lookup: peripheral → resolved peerId
     private var peripheralPeerIds: [CBPeripheral: String] = [:]
+    /// Heartbeat characteristic per peripheral (for re-subscribing after reconnect)
+    private var peripheralCharacteristics: [CBPeripheral: CBCharacteristic] = [:]
     /// Connected resolved peers
     private var connectedPeerIds: Set<String> = []
     /// Peers paired via MP — BT only auto-connects to these
@@ -75,6 +86,7 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
         pendingPeripherals.removeAll()
         resolvedPeripherals.removeAll()
         peripheralPeerIds.removeAll()
+        peripheralCharacteristics.removeAll()
         connectedPeerIds.removeAll()
         centralManager = nil
         peripheralManager = nil
@@ -85,6 +97,9 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
         for peerId in connectedPeerIds {
             deviceManager.heartbeatDetected(peerId, via: .bluetooth)
         }
+        guard let char = characteristic,
+              let data = DeviceIdentity.peerName.data(using: .utf8) else { return }
+        peripheralManager?.updateValue(data, for: char, onSubscribedCentrals: nil)
     }
 
     func disconnect(peer: Peer) {
@@ -111,8 +126,8 @@ extension DefaultBluetoothConnectivityService: CBPeripheralManagerDelegate {
 
         let char = CBMutableCharacteristic(
             type: characteristicUUID,
-            properties: [.read],
-            value: DeviceIdentity.peerName.data(using: .utf8),
+            properties: [.read, .notify],
+            value: nil,
             permissions: [.readable]
         )
         self.characteristic = char
@@ -120,6 +135,16 @@ extension DefaultBluetoothConnectivityService: CBPeripheralManagerDelegate {
         let service = CBMutableService(type: serviceUUID, primary: true)
         service.characteristics = [char]
         peripheral.add(service)
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveRead request: CBATTRequest) {
+        guard request.characteristic.uuid == characteristicUUID,
+              let data = DeviceIdentity.peerName.data(using: .utf8) else {
+            peripheral.respond(to: request, withResult: .requestNotSupported)
+            return
+        }
+        request.value = data
+        peripheral.respond(to: request, withResult: .success)
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
@@ -164,11 +189,16 @@ extension DefaultBluetoothConnectivityService: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         Log.debug("Bluetooth service connected to peripheral: \(peripheral.identifier)")
 
-        // Already resolved from a previous connection — just mark connected
+        // Already resolved from a previous connection — just mark connected and re-subscribe
         if let peerId = peripheralPeerIds[peripheral], pairedPeers.contains(peerId) {
             connectedPeerIds.insert(peerId)
             deviceManager.peerDiscovered(peerId, via: .bluetooth)
             deviceManager.peerConnected(peerId, via: .bluetooth)
+            if let char = peripheralCharacteristics[peripheral] {
+                peripheral.setNotifyValue(true, for: char)
+            } else {
+                peripheral.discoverServices([serviceUUID])
+            }
             return
         }
 
@@ -216,7 +246,9 @@ extension DefaultBluetoothConnectivityService: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         guard let chars = service.characteristics else { return }
         for char in chars where char.uuid == characteristicUUID {
+            peripheralCharacteristics[peripheral] = char
             peripheral.readValue(for: char)
+            peripheral.setNotifyValue(true, for: char)
         }
     }
 
@@ -225,9 +257,13 @@ extension DefaultBluetoothConnectivityService: CBPeripheralDelegate {
               let data = characteristic.value,
               let peerName = String(data: data, encoding: .utf8) else { return }
 
-        // Already resolved
-        if let existing = peripheralPeerIds[peripheral], existing == peerName { return }
+        // Already resolved — this is a heartbeat notification from the peer
+        if let peerId = peripheralPeerIds[peripheral] {
+            deviceManager.heartbeatDetected(peerId, via: .bluetooth)
+            return
+        }
 
+        // First time — name resolution
         Log.debug("Bluetooth service resolved the name: \(peerName)")
         pendingPeripherals.removeValue(forKey: peripheral)
         peripheralPeerIds[peripheral] = peerName

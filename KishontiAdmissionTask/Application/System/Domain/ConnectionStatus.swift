@@ -6,7 +6,8 @@
 //
 
 enum ConnectionStatus {
-    case unknown
-    case online
-    case offline
+    case full
+    case bluetooth
+    case multipeer
+    case unavailable
 }

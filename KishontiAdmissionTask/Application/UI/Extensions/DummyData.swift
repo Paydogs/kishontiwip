@@ -8,7 +8,7 @@
 extension ConnectionStatus {
     static func randomStatuses(count: Int) -> [ConnectionStatus] {
         (0..<count).map { _ in
-            [.unknown, .online, .offline].randomElement() ?? .unknown
+            [.unavailable, .full, .bluetooth, .multipeer].randomElement() ?? .unavailable
         }
     }
 }

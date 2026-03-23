@@ -6,9 +6,11 @@
 //
 
 import Foundation
+import UIKit
 import FactoryKit
 
 protocol SystemService: Actor {
+    /// Wires up all store observation tasks: service activation, heartbeat scheduling, pairing changes, auto-reconnect, foreground resume, invite confirmation, and peer-list sync.
     func start()
 }
 
@@ -22,7 +24,8 @@ actor DefaultSystemService: SystemService {
     private var heartbeatSettingsObservationTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
     private var pairingObservationTask: Task<Void, Never>?
-//    private var reconnectObservationTask: Task<Void, Never>?
+    private var reconnectObservationTask: Task<Void, Never>?
+    private var foregroundObservationTask: Task<Void, Never>?
     private var inviteConfirmationTask: Task<Void, Never>?
     private var peerListObservationTask: Task<Void, Never>?
     private var pendingManualInvites: Set<String> = []
@@ -36,9 +39,10 @@ actor DefaultSystemService: SystemService {
         listenServiceStatusChanges()
         runHeartbeatTasks()
         listenPairedPeers()
-//        listenForAutoReconnect()
+        listenForAutoReconnect()
         listenForInviteConfirmation()
         listenPeerListChanges()
+        listenForForegroundReentry()
     }
     
     deinit {
@@ -46,7 +50,8 @@ actor DefaultSystemService: SystemService {
         heartbeatSettingsObservationTask?.cancel()
         heartbeatTask?.cancel()
         pairingObservationTask?.cancel()
-//        reconnectObservationTask?.cancel()
+        reconnectObservationTask?.cancel()
+        foregroundObservationTask?.cancel()
         inviteConfirmationTask?.cancel()
         peerListObservationTask?.cancel()
     }
@@ -79,7 +84,36 @@ extension DefaultSystemService: ActionHandler {
     }
 }
 
+// MARK: Tasks
 private extension DefaultSystemService {
+    ///
+    /// Handles the service start and stop
+    ///
+    /// Observes `isServiceActive`
+    ///
+    func listenServiceStatusChanges() {
+        serviceStatusObservationTask?.cancel()
+        serviceStatusObservationTask = Task {
+            let stream = await store.stream(\.isServiceActive)
+            for await state in stream {
+                if state.isServiceActive {
+                    multiPeerService.startService()
+                    bluetoothService.startService()
+                } else {
+                    multiPeerService.stopService()
+                    bluetoothService.stopService()
+                }
+            }
+        }
+    }
+    
+    ///
+    /// Runs a periodic task that fires heartbeats on both transports at the configured interval.
+    /// Handles if the interval change.
+    /// Cancels the task when the service is inactive or interval is zero.
+    ///
+    /// Observes `heartbeatInterval` and `isServiceActive`;
+    ///
     func runHeartbeatTasks() {
         heartbeatSettingsObservationTask?.cancel()
         heartbeatSettingsObservationTask = Task {
@@ -100,17 +134,27 @@ private extension DefaultSystemService {
         }
     }
 
+    ///
+    /// Watches for pairing changes.
+    /// Disconnects newly unpaired peers via Bluetooth.
+    /// Enables Bluetooth reconnect for newly paired peers.
+    ///
+    /// Observes `pairedPeerIds`;
+    ///
     func listenPairedPeers() {
         pairingObservationTask?.cancel()
         pairingObservationTask = Task {
             var knownPairedIds: Set<String> = []
+            
             let stream = await store.stream(\.pairedPeerIds)
             for await state in stream {
                 let currentPairs = state.pairedPeerIds
                 let newPeers = currentPairs.subtracting(knownPairedIds)
                 let unpairedPeers = knownPairedIds.subtracting(currentPairs)
                 knownPairedIds = currentPairs
-                
+
+                multiPeerService.updatePairedPeers(currentPairs)
+
                 for peerId in unpairedPeers {
                     guard let peer = state.peerList[peerId] else { continue }
                     bluetoothService.disconnect(peer: peer)
@@ -119,42 +163,56 @@ private extension DefaultSystemService {
                 for peerId in newPeers {
                     guard let peer = state.peerList[peerId] else { continue }
                     bluetoothService.reconnectKnownPeer(peer: peer)
-                    multiPeerService.reconnectKnownPeer(peer: peer)
                 }
-//                let added = state.pairedPeerIds.subtracting(knownPairedIds)
-//                let removed = knownPairedIds.subtracting(state.pairedPeerIds)
-//                knownPairedIds = state.pairedPeerIds
-//                for peerId in removed {
-//                    let peer = state.peerList[peerId] ?? Peer(peerId: peerId, name: peerId)
-//                    bluetoothService.disconnect(peer: peer)
-//                }
-//                for peerId in added {
-//                    let peer = state.peerList[peerId] ?? Peer(peerId: peerId, name: peerId)
-//                    bluetoothService.allowReconnect(peer: peer)
-//                    if state.discoveredPeers.contains(peerId) {
-//                        multiPeerService.invite(peer: peer)
-//                    }
-//                }
             }
         }
     }
 
-//    func listenForAutoReconnect() {
-//        reconnectObservationTask?.cancel()
-//        reconnectObservationTask = Task {
-//            let stream = await store.stream(\.discoveredPeers, \.pairedPeerIds)
-//            for await state in stream {
-//                for peerId in state.discoveredPeers {
-//                    guard state.pairedPeerIds.contains(peerId),
-//                          let peer = state.peerList[peerId] else { continue }
-//                    Log.debug("Auto-reconnecting to \(peer.name)")
-//                    multiPeerService.invite(peer: peer)
-//                }
-//            }
-//        }
-//    }
+    ///
+    /// Automatically re-invites any discovered peer that is already paired.
+    ///
+    /// Observes `discoveredPeers` and `pairedPeerIds`;
+    ///
+    func listenForAutoReconnect() {
+        reconnectObservationTask?.cancel()
+        reconnectObservationTask = Task {
+            let stream = await store.stream(\.discoveredPeers, \.pairedPeerIds)
+            for await state in stream {
+                for peerId in state.discoveredPeers {
+                    guard state.pairedPeerIds.contains(peerId),
+                          let peer = state.peerList[peerId] else { continue }
+                    Log.debug("reconnectObservationTask Auto-reconnecting to \(peer.name)")
+                    multiPeerService.reconnectKnownPeer(peer: peer)
+                }
+            }
+        }
+    }
 
-    // If a new connectedPeer appears, remove the
+    ///
+    /// Re-invites all paired peers via MC when the service is active, recovering connections dropped while the app was backgrounded.
+    ///
+    /// Listens for `didBecomeActive` notifications
+    ///
+    func listenForForegroundReentry() {
+        foregroundObservationTask?.cancel()
+        foregroundObservationTask = Task {
+            let notifications = NotificationCenter.default.notifications(named: UIApplication.didBecomeActiveNotification)
+            for await _ in notifications {
+                let state = await store.currentState
+                guard state.isServiceActive else { continue }
+                for peerId in state.pairedPeerIds {
+                    guard let peer = state.peerList[peerId] else { continue }
+                    Log.debug("foregroundObservationTask Auto-reconnecting to \(peer.name)")
+                    multiPeerService.reconnectKnownPeer(peer: peer)
+                }
+            }
+        }
+    }
+
+    /// When a peer from `pendingManualInvites` connects, removes it from the pending set and pairs it via the device service.
+    ///
+    /// Observes `connectedPeers`
+    ///
     func listenForInviteConfirmation() {
         inviteConfirmationTask?.cancel()
         inviteConfirmationTask = Task {
@@ -171,28 +229,16 @@ private extension DefaultSystemService {
         }
     }
 
+    /// Forwards every update to the device service to keep its local cache in sync.
+    ///
+    /// Observes `peerList`
+    ///
     func listenPeerListChanges() {
         peerListObservationTask?.cancel()
         peerListObservationTask = Task {
             let stream = await store.stream(\.peerList)
             for await state in stream {
                 deviceService.updatePeerList(state.peerList)
-            }
-        }
-    }
-
-    func listenServiceStatusChanges() {
-        serviceStatusObservationTask?.cancel()
-        serviceStatusObservationTask = Task {
-            let stream = await store.stream(\.isServiceActive)
-            for await state in stream {
-                if state.isServiceActive {
-                    multiPeerService.startService()
-                    bluetoothService.startService()
-                } else {
-                    multiPeerService.stopService()
-                    bluetoothService.stopService()
-                }
             }
         }
     }

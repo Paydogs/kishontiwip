@@ -16,15 +16,35 @@ struct PendingInvitation: Identifiable {
 }
 
 protocol MultiPeerService {
+    /// Creates the advertiser and browser, then begins advertising and browsing for peers.
     func startService()
+
+    /// Stops advertising and browsing, notifies the device manager of every lost peer, and clears the peer-ID stack.
     func stopService()
+
+    /// Notifies the device manager of a heartbeat for every peer currently in the MC session.
     func sendHeartbeats()
+
+    /// Sends an MC invitation to `peer`. No-ops if the peer is unknown or already connected.
     func invite(peer: Peer)
+
+    /// Re-invites a previously paired `peer` that has been rediscovered. No-ops if already connected.
     func reconnectKnownPeer(peer: Peer)
+
+    /// Accepts the pending invitation, joins the shared session, and clears the pending-invitation state.
     func acceptInvitation()
+
+    /// Rejects the pending invitation without joining the session, and clears the pending-invitation state.
     func declineInvitation()
+
+    /// Encodes `action` as JSON and sends it reliably to `peer` over the active MC session.
     func send(action: RemoteAction, to peer: Peer)
+
+    /// Disconnects the entire MC session and notifies the device manager that `peer` has disconnected.
     func disconnect(peer: Peer)
+
+    /// Replaces the set of paired peer IDs used to auto-accept incoming invitations.
+    func updatePairedPeers(_ peerIds: Set<String>)
 }
 
 // MARK: - PeerService
@@ -38,6 +58,7 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
     var pendingInvitation: PendingInvitation?
 
     private var peerIdStack: [String: MCPeerID] = [:]
+    private var pairedPeers: Set<String> = []
     private var isActive: Bool = false
     
     init(deviceManager: DeviceManaging) {
@@ -73,6 +94,7 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
     }
     
     func invite(peer: Peer) {
+        Log.debug("Multipeer service want to send invite to \(peer.name)")
         guard let mcPeerID = peerIdStack[peer.peerId] else {
             Log.debug("Invite failed: no MCPeerID for \(peer.name)")
             return
@@ -86,6 +108,7 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
     }
 
     func reconnectKnownPeer(peer: Peer) {
+        Log.debug("Multipeer service want to reconnect to \(peer.name). peerIdStack is \(peerIdStack), sessionStack is \(session.connectedPeers)")
         guard let mcPeerID = peerIdStack[peer.peerId] else {
             Log.debug("Invite failed: no MCPeerID for \(peer.name)")
             return
@@ -131,6 +154,10 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
         session.disconnect()
         deviceManager.peerDisconnected(peer.peerId, via: .multipeer)
         Log.debug("Multipeer service disconnected from \(peer.name)")
+    }
+
+    func updatePairedPeers(_ peerIds: Set<String>) {
+        pairedPeers = peerIds
     }
 }
 
@@ -187,7 +214,7 @@ extension DefaultMultiPeerService: MCSessionDelegate {
         peer peerID: MCPeerID,
         didChange state: MCSessionState
     ) {
-        Log.debug("Multipeer Session state \(state) didChange with peer: \(peerID)")
+        Log.debug("Multipeer Session state didChange to \(state.localizedName) on peer: \(peerID)")
         switch state {
         case .connected:
             deviceManager.peerConnected(peerID.displayName, via: .multipeer)
@@ -233,8 +260,18 @@ extension DefaultMultiPeerService: MCNearbyServiceAdvertiserDelegate {
             invitationHandler(false, nil)
             return
         }
-        pendingInvitation = PendingInvitation(peerID: peerID, handler: invitationHandler)
         peerIdStack[peerID.displayName] = peerID
+        if pairedPeers.contains(peerID.displayName) {
+            if let existing = pendingInvitation, existing.peerID.displayName == peerID.displayName {
+                Log.debug("Invitation ignored: duplicate in-flight for \(peerID.displayName)")
+                invitationHandler(false, nil)
+                return
+            }
+            Log.debug("Multipeer Advertiser auto-accepting paired peer \(peerID.displayName)")
+            invitationHandler(true, session)
+            return
+        }
+        pendingInvitation = PendingInvitation(peerID: peerID, handler: invitationHandler)
         deviceManager.invitationReceived(from: peerID.displayName)
     }
 
@@ -272,5 +309,16 @@ extension DefaultMultiPeerService: MCNearbyServiceBrowserDelegate {
         didNotStartBrowsingForPeers error: Error
     ) {
         Log.debug("Multipeer Browser didNotStartBrowsingForPeers: \(error)")
+    }
+}
+
+extension MCSessionState {
+    var localizedName: String {
+        switch self {
+        case .notConnected: return "Not Connected"
+        case .connecting: return "Connecting"
+        case .connected: return "Connected"
+        @unknown default: return "Unknown"
+        }
     }
 }

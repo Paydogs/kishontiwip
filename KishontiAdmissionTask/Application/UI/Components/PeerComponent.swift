@@ -58,18 +58,7 @@ struct PeerComponent: View {
             .padding()
 
             if !heartbeats.isEmpty {
-                let btCount = heartbeats.filter { $0.transport == .bluetooth }.count
-                let mpCount = heartbeats.filter { $0.transport == .multipeer }.count
-                HStack(spacing: 8) {
-                    ValueCard(value: "\(btCount)",
-                              valueColor: btCount > 0 ? Asset.Colors.General.blue.swiftUIColor : Asset.Colors.Text.secondary.swiftUIColor,
-                              title: "BT")
-                    ValueCard(value: "\(mpCount)",
-                              valueColor: mpCount > 0 ? Asset.Colors.General.green.swiftUIColor : Asset.Colors.Text.secondary.swiftUIColor,
-                              title: "MP")
-                    Spacer()
-                }
-                .padding([.horizontal, .bottom])
+                AvailabilityComponent(connectionStatuses: heartbeats.connectionStatuses(slice: .seconds(15)))
             }
         }
         .background(Asset.Colors.Background.bg2.swiftUIColor)
@@ -81,7 +70,7 @@ struct PeerComponent: View {
     PeerComponent(text: "iPhone 12 mini",
                   chips: [.init(text: "Own", color: Asset.Colors.Text.primary.swiftUIColor),
                           .init(text: "BT", color: Asset.Colors.General.blue.swiftUIColor),
-                          .init(text: "MultiPoint", color: Asset.Colors.General.yellow.swiftUIColor),
+                          .init(text: "Multipoint", color: Asset.Colors.General.yellow.swiftUIColor),
                           .init(text: "MultiLine test", color: Asset.Colors.General.yellow.swiftUIColor)],
                   image: Image.init(systemName: "power"),
                   isOn: false,

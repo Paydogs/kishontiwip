@@ -61,7 +61,7 @@ public final class AppStore: ActionHandler {
                 updated.activeTransports.insert(transport)
                 state.peerList[peer.peerId] = updated
                 state.discoveredPeers.insert(peer.peerId)
-                Log.debug("[Store] Updated peerList: \(state.peerList)")
+                Log.debug("[Store] transportDiscovered Updated peerList: \(state.peerList)")
             }
         // Transport lost for peer
         case .transportLost(let peerId, let transport):
@@ -72,7 +72,7 @@ public final class AppStore: ActionHandler {
                     state.connectedPeers.remove(peerId)
                 } else {
                     state.peerList[peerId] = existing
-                    Log.debug("[Store] Updated peerList: \(state.peerList)")
+                    Log.debug("[Store] transportLost Updated peerList: \(state.peerList)")
                 }
             }
         // Peer connected
@@ -83,7 +83,7 @@ public final class AppStore: ActionHandler {
                 state.peerList[peer.peerId] = updated
                 state.connectedPeers.insert(peer.peerId)
                 state.discoveredPeers.remove(peer.peerId)
-                Log.debug("[Store] Updated peerList: \(state.peerList)")
+                Log.debug("[Store] peerConnected, Updated peerList: \(state.peerList)")
             }
         // Peer disconnected
         case .peerDisconnected(let peerId, let transport):
@@ -94,18 +94,20 @@ public final class AppStore: ActionHandler {
                     state.connectedPeers.remove(peerId)
                 } else {
                     state.peerList[peerId] = existing
-                    Log.debug("[Store] Updated peerList: \(state.peerList)")
+                    Log.debug("[Store] peerDisconnected, Updated peerList: \(state.peerList)")
                 }
             }
         // Invitation received from peer
         case .invitationReceived(let peerId):
             await store.update { state in
                 state.pendingInvitation = peerId
+                Log.debug("[Store] invitationReceived from \(peerId)")
             }
         // Invitation handled
         case .invitationCleared:
             await store.update { state in
                 state.pendingInvitation = nil
+                Log.debug("[Store] invitationCleared")
             }
         // New item for the Event Log
         case .addToEventLog(let message):
@@ -130,6 +132,7 @@ public final class AppStore: ActionHandler {
         // New heartbeat received
         case .heartbeatDetected(let peerId, let heartbeat):
             await store.update { state in
+                Log.debug("[Store] \(heartbeat) received from \(peerId)")
                 let retentionEndDate = Date().addingTimeInterval(-.hours(state.heartbeatRetentionHours))
                 var entries = state.heartbeats[peerId, default: []]
                 entries.append(heartbeat)
@@ -139,12 +142,14 @@ public final class AppStore: ActionHandler {
         case .peerPaired(let peerId):
             await store.update { state in
                 state.pairedPeerIds.insert(peerId)
+                Log.debug("[Store] New paired peer: \(peerId), current paired peers: \(state.pairedPeerIds)")
             }
         // Peer unpaired
         case .peerUnpaired(let peerId):
             await store.update { state in
                 state.pairedPeerIds.remove(peerId)
                 state.connectedPeers.remove(peerId)
+                Log.debug("[Store] \(peerId) unpaired, current paired peers: \(state.pairedPeerIds), current connected peers: \(state.connectedPeers)")
             }
         // Reset logs
         case .resetLog:

@@ -8,24 +8,25 @@
 import SwiftUI
 
 struct AvailabilityComponent: View {
+    let connectionStatuses: [ConnectionStatus]
+    
     var body: some View {
         VStack {
             VStack {
                 HStack {
-                    Text("iPhone 12 mini")
-                        .font(Fonts.regular(size: 18))
                     Spacer()
-                    Text("94.2%")
+                    Text(connectionStatuses.globalPercentageText)
                         .font(Fonts.regular(size: 16))
                         .foregroundStyle(Asset.Colors.General.green.swiftUIColor)
                 }
-                TimelineBar(connectionStatuses: ConnectionStatus.randomStatuses(count: 24))
+                TimelineBar(connectionStatuses: connectionStatuses)
                     .frame(height: 36)
+                    .padding(.vertical)
                 HStack {
-                    ValueCard(value: "24.6h", valueColor: .green, title: "ONLINE")
-                    ValueCard(value: "10.0h", valueColor: .red, title: "OFFLINE")
-                    ValueCard(value: "5", valueColor: .gray, title: "SESSIONS")
-                    ValueCard(value: "4h 10m", valueColor: .gray, title: "LONGEST")
+                    ValueCard(value: "\(connectionStatuses.percentageText(.full))", valueColor: .green, title: "FULL")
+                    ValueCard(value: "\(connectionStatuses.percentageText(.multipeer))", valueColor: .yellow, title: "MULTIPEER")
+                    ValueCard(value: "\(connectionStatuses.percentageText(.bluetooth))", valueColor: .blue, title: "BLUETOOTH")
+                    ValueCard(value: "\(connectionStatuses.percentageText(.unavailable))", valueColor: .gray, title: "UNAVAILABLE")
                 }
             }
             .padding()
@@ -36,6 +37,6 @@ struct AvailabilityComponent: View {
 }
 
 #Preview {
-    AvailabilityComponent()
+    AvailabilityComponent(connectionStatuses: ConnectionStatus.randomStatuses(count: 24))
         .padding()
 }
