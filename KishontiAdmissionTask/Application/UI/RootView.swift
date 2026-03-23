@@ -113,7 +113,7 @@ extension RootView {
                       image: Image(systemName: "link"),
                       isOn: false,
                       heartbeats: [],
-                      toggle: { viewModel.connect(peer: peer) })
+                      toggle: { viewModel.pair(peer: peer) })
     }
 
     @ViewBuilder
@@ -123,7 +123,7 @@ extension RootView {
                       image: Image(systemName: "link.circle.fill"),
                       isOn: true,
                       heartbeats: viewModel.heartbeats(for: peer),
-                      toggle: { viewModel.disconnect(peer: peer) })
+                      toggle: { viewModel.unpair(peer: peer) })
     }
     
     @ViewBuilder
@@ -146,9 +146,10 @@ extension RootView {
     let detectedPeer = Peer(peerId: "id1", name: "iPhone 12 mini", activeTransports: [.bluetooth, .multipeer])
     let connectedPeer = Peer(peerId: "id2", name: "iPhone 13", activeTransports: [.bluetooth])
     let previewStore = AppStore(actionBus: ActionBus(),
-                                initialState: AppState(discoveredPeers: ["id1": detectedPeer],
-                                                       connectedPeers: ["id2" : connectedPeer],
-                                                       messages: [message1, message2]))
+                                initialState: AppState(peerList: ["id1": detectedPeer, "id2": connectedPeer],
+                                                       discoveredPeers: ["id1"],
+                                                       connectedPeers: ["id2"],
+                                                       logs: [message1, message2]))
     Container.shared.appStore.preview { previewStore }
     
     RootView()

@@ -13,7 +13,7 @@ protocol BluetoothConnectivityService {
     func stopService()
     func sendHeartbeats()
     func disconnect(peer: Peer)
-    func allowReconnect(peer: Peer)
+    func reconnectKnownPeer(peer: Peer)
 }
 
 final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivityService {
@@ -45,7 +45,7 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
     func startService() {
         guard !isActive else { return }
         isActive = true
-        Log.debug("BT starting")
+        Log.debug("Bluetooth service starting")
         centralManager = CBCentralManager(delegate: self, queue: nil)
         peripheralManager = CBPeripheralManager(delegate: self, queue: nil)
     }
@@ -53,18 +53,21 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
     func stopService() {
         guard isActive else { return }
         isActive = false
-        Log.debug("BT stopping")
+        Log.debug("Bluetooth service stopping")
 
         centralManager?.stopScan()
         peripheralManager?.stopAdvertising()
         peripheralManager?.removeAllServices()
 
+        Log.debug("Dropping bluetooth transports")
         for peerId in connectedPeerIds {
-            deviceManager.peerDisconnected(Peer(peerId: peerId, name: peerId), via: .bluetooth)
+            deviceManager.peerDisconnected(peerId, via: .bluetooth)
         }
+        Log.debug("Canceling every peripheral connection")
         for (peripheral, _) in pendingPeripherals {
             centralManager?.cancelPeripheralConnection(peripheral)
         }
+        Log.debug("Canceling every resolved connection")
         for (_, peripheral) in resolvedPeripherals {
             centralManager?.cancelPeripheralConnection(peripheral)
         }
@@ -80,7 +83,7 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
 
     func sendHeartbeats() {
         for peerId in connectedPeerIds {
-            deviceManager.heartbeatDetected(Peer(peerId: peerId, name: peerId), via: .bluetooth)
+            deviceManager.heartbeatDetected(peerId, via: .bluetooth)
         }
     }
 
@@ -88,10 +91,11 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
         pairedPeers.remove(peer.peerId)
         guard let peripheral = resolvedPeripherals[peer.peerId] else { return }
         centralManager?.cancelPeripheralConnection(peripheral)
-        Log.debug("BT disconnected \(peer.name)")
+        deviceManager.peerDisconnected(peer.peerId, via: .bluetooth)
+        Log.debug("Bluetooth service disconnected [disconnect] from \(peer.name)")
     }
 
-    func allowReconnect(peer: Peer) {
+    func reconnectKnownPeer(peer: Peer) {
         pairedPeers.insert(peer.peerId)
         // If already discovered but rejected earlier, connect now
         if let peripheral = resolvedPeripherals[peer.peerId], !connectedPeerIds.contains(peer.peerId) {
@@ -120,14 +124,14 @@ extension DefaultBluetoothConnectivityService: CBPeripheralManagerDelegate {
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
         if let error {
-            Log.error("BT add service failed: \(error.localizedDescription)")
+            Log.error("Bluetooth service add service failed: \(error.localizedDescription)")
             return
         }
         peripheral.startAdvertising([
             CBAdvertisementDataServiceUUIDsKey: [serviceUUID],
             CBAdvertisementDataLocalNameKey: DeviceIdentity.peerName
         ])
-        Log.debug("BT advertising as \(DeviceIdentity.peerName)")
+        Log.debug("Bluetooth service advertising as \(DeviceIdentity.peerName)")
     }
 }
 
@@ -135,7 +139,7 @@ extension DefaultBluetoothConnectivityService: CBPeripheralManagerDelegate {
 extension DefaultBluetoothConnectivityService: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         guard central.state == .poweredOn, isActive else { return }
-        Log.debug("BT scanning")
+        Log.debug("Bluetooth service scanning")
         central.scanForPeripherals(withServices: [serviceUUID], options: [
             CBCentralManagerScanOptionAllowDuplicatesKey: false
         ])
@@ -151,21 +155,20 @@ extension DefaultBluetoothConnectivityService: CBCentralManagerDelegate {
         guard pendingPeripherals[peripheral] == nil,
               peripheralPeerIds[peripheral] == nil else { return }
 
-        Log.debug("BT discovered peripheral: \(peripheral.identifier)")
+        Log.debug("Bluetooth service discovered peripheral: \(peripheral.identifier)")
         pendingPeripherals[peripheral] = ()
         peripheral.delegate = self
         central.connect(peripheral, options: nil)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        Log.debug("BT connected peripheral: \(peripheral.identifier)")
+        Log.debug("Bluetooth service connected to peripheral: \(peripheral.identifier)")
 
         // Already resolved from a previous connection — just mark connected
         if let peerId = peripheralPeerIds[peripheral], pairedPeers.contains(peerId) {
             connectedPeerIds.insert(peerId)
-            let peer = Peer(peerId: peerId, name: peerId)
-            deviceManager.peerDiscovered(peer, via: .bluetooth)
-            deviceManager.peerConnected(peer, via: .bluetooth)
+            deviceManager.peerDiscovered(peerId, via: .bluetooth)
+            deviceManager.peerConnected(peerId, via: .bluetooth)
             return
         }
 
@@ -174,7 +177,7 @@ extension DefaultBluetoothConnectivityService: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
-        Log.error("BT connect failed: \(peripheral.identifier) \(error?.localizedDescription ?? "")")
+        Log.error("Bluetooth service connecttion failed: \(peripheral.identifier) \(error?.localizedDescription ?? "")")
         // Retry if still active
         if isActive {
             central.connect(peripheral, options: nil)
@@ -187,9 +190,9 @@ extension DefaultBluetoothConnectivityService: CBCentralManagerDelegate {
         let peerId = peripheralPeerIds[peripheral]
 
         if let peerId, connectedPeerIds.contains(peerId) {
-            Log.debug("BT disconnected: \(peerId)")
+            Log.debug("Bluetooth service disconnected from \(peerId)")
             connectedPeerIds.remove(peerId)
-            deviceManager.peerDisconnected(Peer(peerId: peerId, name: peerId), via: .bluetooth)
+            deviceManager.peerDisconnected(peerId, via: .bluetooth)
         } else {
             pendingPeripherals.removeValue(forKey: peripheral)
         }
@@ -225,7 +228,7 @@ extension DefaultBluetoothConnectivityService: CBPeripheralDelegate {
         // Already resolved
         if let existing = peripheralPeerIds[peripheral], existing == peerName { return }
 
-        Log.debug("BT resolved: \(peerName)")
+        Log.debug("Bluetooth service resolved the name: \(peerName)")
         pendingPeripherals.removeValue(forKey: peripheral)
         peripheralPeerIds[peripheral] = peerName
         resolvedPeripherals[peerName] = peripheral
@@ -237,8 +240,7 @@ extension DefaultBluetoothConnectivityService: CBPeripheralDelegate {
         }
 
         connectedPeerIds.insert(peerName)
-        let peer = Peer(peerId: peerName, name: peerName)
-        deviceManager.peerDiscovered(peer, via: .bluetooth)
-        deviceManager.peerConnected(peer, via: .bluetooth)
+        deviceManager.peerDiscovered(peerName, via: .bluetooth)
+        deviceManager.peerConnected(peerName, via: .bluetooth)
     }
 }

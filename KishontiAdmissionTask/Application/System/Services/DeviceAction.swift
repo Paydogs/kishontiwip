@@ -7,7 +7,8 @@
 
 public enum DeviceAction: Intent {
     case invite(Peer)
-    case disconnect(Peer)
+    case unpair(Peer)
+    case remoteUnpair(Peer)
     case acceptInvitation
     case declineInvitation
 }

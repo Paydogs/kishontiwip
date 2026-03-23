@@ -14,28 +14,32 @@ extension AppAction {
             return .addToEventLog(NetworkEventLogItem(primaryText: "Your app", secondaryText: "\(bool ? "started" : "stopped") services", date: Date(), severity: bool ? .info : .error))
         case .transportDiscovered(let peer, let transport):
             return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "discovered (\(transport.rawValue))", date: Date(), severity: .info))
-        case .transportLost(let peer, let transport):
-            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "lost (\(transport.rawValue))", date: Date(), severity: .error))
+        case .transportLost(let peerId, let transport):
+            return .addToEventLog(NetworkEventLogItem(primaryText: peerId, secondaryText: "lost (\(transport.rawValue))", date: Date(), severity: .error))
         case .peerConnected(let peer, let transport):
             return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "connected (\(transport.rawValue))", date: Date(), severity: .info))
-        case .peerDisconnected(let peer, let transport):
-            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "disconnected (\(transport.rawValue))", date: Date(), severity: .error))
+        case .peerDisconnected(let peerId, let transport):
+            return .addToEventLog(NetworkEventLogItem(primaryText: peerId, secondaryText: "disconnected (\(transport.rawValue))", date: Date(), severity: .error))
         case .addToEventLog(_):
             return action
-        case .invitationReceived(let peer):
-            return .addToEventLog(NetworkEventLogItem(primaryText: "Recieved invitation from \(peer.name)", secondaryText: "", date: Date(), severity: .info))
+        case .invitationReceived(let peerId):
+            return .addToEventLog(NetworkEventLogItem(primaryText: "Recieved invitation from \(peerId)", secondaryText: "", date: Date(), severity: .info))
         case .invitationCleared:
             return .addToEventLog(NetworkEventLogItem(primaryText: "Invitation cleared", secondaryText: "", date: Date(), severity: .info))
         case .setHeartbeatInterval(let interval):
-            return .addToEventLog(NetworkEventLogItem(primaryText: "Heartbeat interval", secondaryText: "\(Int(interval))s", date: Date(), severity: .info))
+            return .addToEventLog(NetworkEventLogItem(primaryText: "Heartbeat interval", secondaryText: "changed to \(Int(interval))s", date: Date(), severity: .info))
         case .setHeartbeatRetentionHours(let hours):
-            return .addToEventLog(NetworkEventLogItem(primaryText: "Heartbeat retention", secondaryText: "\(hours)h", date: Date(), severity: .info))
+            return .addToEventLog(NetworkEventLogItem(primaryText: "Heartbeat retention", secondaryText: "changed to \(hours)h", date: Date(), severity: .info))
         case .heartbeatDetected:
             return action
         case .resetStorage:
             return .addToEventLog(NetworkEventLogItem(primaryText: "Reseting store", secondaryText: "", date: Date(), severity: .error))
         case .resetLog:
             return .addToEventLog(NetworkEventLogItem(primaryText: "Clearing logs", secondaryText: "", date: Date(), severity: .error))
+        case .peerPaired(_):
+            return .addToEventLog(NetworkEventLogItem(primaryText: "Peer paired", secondaryText: "", date: Date(), severity: .info))
+        case .peerUnpaired(_):
+            return .addToEventLog(NetworkEventLogItem(primaryText: "Peer unpaired", secondaryText: "", date: Date(), severity: .error))
         }
     }
 }
@@ -45,12 +49,14 @@ extension DeviceAction {
         switch action {
         case .invite(let peer):
             return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "invited", date: Date(), severity: .warning))
-        case .disconnect(let peer):
-            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "disconnected", date: Date(), severity: .error))
+        case .unpair(let peer):
+            return .addToEventLog(NetworkEventLogItem(primaryText: peer.name, secondaryText: "unpaired", date: Date(), severity: .error))
         case .acceptInvitation:
             return .addToEventLog(NetworkEventLogItem(primaryText: "Accepted invitation", secondaryText: "", date: Date(), severity: .info))
         case .declineInvitation:
             return .addToEventLog(NetworkEventLogItem(primaryText: "Declined invitation", secondaryText: "", date: Date(), severity: .error))
+        case .remoteUnpair(_):
+            return .addToEventLog(NetworkEventLogItem(primaryText: "Other device unpaired", secondaryText: "", date: Date(), severity: .error))
         }
     }
 }

@@ -29,11 +29,11 @@ final class RootViewModel: ObservableObject {
                 // due to lack of @Observable
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    self.connectedPeers = Array(state.connectedPeers.values)
+                    self.connectedPeers = state.connectedPeers.compactMap { state.peerList[$0] }
                     self.isActive = state.isServiceActive
-                    self.discoveredPeers = Array(state.discoveredPeers.values)
-                    self.pendingInvitation = state.pendingInvitation
-                    self.messages = Array(state.messages.sorted { $0.date > $1.date }.prefix(20))
+                    self.discoveredPeers = state.discoveredPeers.subtracting(state.connectedPeers).compactMap { state.peerList[$0] }
+                    self.pendingInvitation = state.pendingInvitation.map { state.peerList[$0] ?? Peer(peerId: $0, name: $0) }
+                    self.messages = Array(state.logs.sorted { $0.date > $1.date }.prefix(20))
                     self.heartbeats = state.heartbeats
                 }
             }
@@ -54,14 +54,14 @@ final class RootViewModel: ObservableObject {
         dispatcher.dispatch(AppAction.createLogAction(from: action))
     }
     
-    func connect(peer: Peer) {
+    func pair(peer: Peer) {
         let action = DeviceAction.invite(peer)
         dispatcher.dispatch(action)
         dispatcher.dispatch(DeviceAction.createLogAction(from: action))
     }
     
-    func disconnect(peer: Peer) {
-        let action = DeviceAction.disconnect(peer)
+    func unpair(peer: Peer) {
+        let action = DeviceAction.unpair(peer)
         dispatcher.dispatch(action)
         dispatcher.dispatch(DeviceAction.createLogAction(from: action))
     }

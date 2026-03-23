@@ -9,9 +9,10 @@ import FactoryKit
 
 extension Container {
     func preInit() {
-        _ = appActionHandler()
+        _ = appStore()
     }
 
+    // MARK: Action and state management
     var actionBus: Factory<ActionBus> {
         Factory(self) { ActionBus() }
             .singleton
@@ -24,23 +25,13 @@ extension Container {
 
     var appStore: Factory<AppStore> {
         Factory(self) { AppStore(actionBus: self.actionBus(),
-                                 persistence: UserDefaultsPersistence(key: "AppStore"),
-                                 initialState: AppState()) }
+                                 persistence: UserDefaultsPersistence(key: "AppStore")) }
         .singleton
     }
 
-    var appActionHandler: Factory<AppActionHandler> {
-        Factory(self) { AppActionHandler(actionBus: self.actionBus(), store: self.appStore()) }
-            .singleton
-    }
-
+    // MARK: services
     var systemService: Factory<SystemService> {
         Factory(self) { DefaultSystemService(actionBus: self.actionBus()) }
-            .singleton
-    }
-    
-    var deviceManager: Factory<DeviceManaging> {
-        Factory(self) { DefaultDeviceManager(dispatcher: self.actionDispatcher()) }
             .singleton
     }
     
@@ -53,4 +44,9 @@ extension Container {
         Factory(self) { DefaultBluetoothConnectivityService(deviceManager: self.deviceManager()) }
             .singleton
     }
+
+    var deviceManager: Factory<DeviceManaging> {
+        Factory(self) { DefaultDeviceManager(dispatcher: self.actionDispatcher()) }
+            .singleton
+    }    
 }

@@ -16,11 +16,9 @@ public protocol StorableProperty: Codable, Hashable, Equatable, Sendable {}
 
 public protocol StoreProtocol: Actor {
     associatedtype StoreState: Sendable & Equatable
-    
+
     var currentState: StoreState { get }
-    
     func stateStream() -> AsyncStream<StoreState>
-    func update(_ mutation: @Sendable (inout StoreState) -> Void)
 }
 
 // MARK: Public BaseStore implementation

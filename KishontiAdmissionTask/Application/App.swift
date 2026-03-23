@@ -23,9 +23,6 @@ struct KishontiAdmissionTaskApp: App {
     }
 
     var body: some Scene {
-        // GeneratedRootView()
-        // .environmentObject(peerService)
-        
         LaunchScreen(config: LaunchScreenConfig.init(backgroundColor: Asset.accentColor.swiftUIColor)) {
             Image(.kishonti)
         } rootContent: {

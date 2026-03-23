@@ -14,16 +14,18 @@ protocol SystemService: Actor {
 
 actor DefaultSystemService: SystemService {
     private let store = Container.shared.appStore()
-    private let deviceManager = Container.shared.deviceManager()
     private let multiPeerService = Container.shared.multiPeerService()
     private let bluetoothService = Container.shared.bluetoothService()
+    private let deviceService = Container.shared.deviceManager()
     
-    private var observationTask: Task<Void, Never>?
-    private var heartbeatObservationTask: Task<Void, Never>?
+    private var serviceStatusObservationTask: Task<Void, Never>?
+    private var heartbeatSettingsObservationTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
     private var pairingObservationTask: Task<Void, Never>?
-    private var reconnectObservationTask: Task<Void, Never>?
-    private var pairedPeerIds: Set<String> = []
+//    private var reconnectObservationTask: Task<Void, Never>?
+    private var inviteConfirmationTask: Task<Void, Never>?
+    private var peerListObservationTask: Task<Void, Never>?
+    private var pendingManualInvites: Set<String> = []
 
     public init(actionBus: ActionSource) {
         actionBus.register(DeviceAction.self, handler: self)
@@ -31,18 +33,22 @@ actor DefaultSystemService: SystemService {
 
     func start() {
         Log.debug("SystemService started")
-        listenStoreChanges()
-        listenHeartbeatInterval()
+        listenServiceStatusChanges()
+        runHeartbeatTasks()
         listenPairedPeers()
-        listenForAutoReconnect()
+//        listenForAutoReconnect()
+        listenForInviteConfirmation()
+        listenPeerListChanges()
     }
     
     deinit {
-        observationTask?.cancel()
-        heartbeatObservationTask?.cancel()
+        serviceStatusObservationTask?.cancel()
+        heartbeatSettingsObservationTask?.cancel()
         heartbeatTask?.cancel()
         pairingObservationTask?.cancel()
-        reconnectObservationTask?.cancel()
+//        reconnectObservationTask?.cancel()
+        inviteConfirmationTask?.cancel()
+        peerListObservationTask?.cancel()
     }
 }
 
@@ -51,16 +57,21 @@ extension DefaultSystemService: ActionHandler {
         guard let action = action as? DeviceAction else { return }
         switch action {
         case .invite(let peer):
+            pendingManualInvites.insert(peer.peerId)
             multiPeerService.invite(peer: peer)
-        case .disconnect(let peer):
-            pairedPeerIds.remove(peer.peerId)
+        case .unpair(let peer):
+            multiPeerService.send(action: .unpair, to: peer)
             multiPeerService.disconnect(peer: peer)
             bluetoothService.disconnect(peer: peer)
-            await store.update { state in
-                state.connectedPeers.removeValue(forKey: peer.peerId)
-                state.discoveredPeers.removeValue(forKey: peer.peerId)
-            }
+            deviceService.unpair(peerId: peer.peerId)
+        case .remoteUnpair(let peer):
+            multiPeerService.disconnect(peer: peer)
+            bluetoothService.disconnect(peer: peer)
+            deviceService.unpair(peerId: peer.peerId)
         case .acceptInvitation:
+            if let peerId = await store.currentState.pendingInvitation {
+                pendingManualInvites.insert(peerId)
+            }
             multiPeerService.acceptInvitation()
         case .declineInvitation:
             multiPeerService.declineInvitation()
@@ -69,9 +80,9 @@ extension DefaultSystemService: ActionHandler {
 }
 
 private extension DefaultSystemService {
-    func listenHeartbeatInterval() {
-        heartbeatObservationTask?.cancel()
-        heartbeatObservationTask = Task {
+    func runHeartbeatTasks() {
+        heartbeatSettingsObservationTask?.cancel()
+        heartbeatSettingsObservationTask = Task {
             let stream = await store.stream(\.heartbeatInterval, \.isServiceActive)
             for await state in stream {
                 heartbeatTask?.cancel()
@@ -92,42 +103,89 @@ private extension DefaultSystemService {
     func listenPairedPeers() {
         pairingObservationTask?.cancel()
         pairingObservationTask = Task {
+            var knownPairedIds: Set<String> = []
+            let stream = await store.stream(\.pairedPeerIds)
+            for await state in stream {
+                let currentPairs = state.pairedPeerIds
+                let newPeers = currentPairs.subtracting(knownPairedIds)
+                let unpairedPeers = knownPairedIds.subtracting(currentPairs)
+                knownPairedIds = currentPairs
+                
+                for peerId in unpairedPeers {
+                    guard let peer = state.peerList[peerId] else { continue }
+                    bluetoothService.disconnect(peer: peer)
+                }
+                
+                for peerId in newPeers {
+                    guard let peer = state.peerList[peerId] else { continue }
+                    bluetoothService.reconnectKnownPeer(peer: peer)
+                    multiPeerService.reconnectKnownPeer(peer: peer)
+                }
+//                let added = state.pairedPeerIds.subtracting(knownPairedIds)
+//                let removed = knownPairedIds.subtracting(state.pairedPeerIds)
+//                knownPairedIds = state.pairedPeerIds
+//                for peerId in removed {
+//                    let peer = state.peerList[peerId] ?? Peer(peerId: peerId, name: peerId)
+//                    bluetoothService.disconnect(peer: peer)
+//                }
+//                for peerId in added {
+//                    let peer = state.peerList[peerId] ?? Peer(peerId: peerId, name: peerId)
+//                    bluetoothService.allowReconnect(peer: peer)
+//                    if state.discoveredPeers.contains(peerId) {
+//                        multiPeerService.invite(peer: peer)
+//                    }
+//                }
+            }
+        }
+    }
+
+//    func listenForAutoReconnect() {
+//        reconnectObservationTask?.cancel()
+//        reconnectObservationTask = Task {
+//            let stream = await store.stream(\.discoveredPeers, \.pairedPeerIds)
+//            for await state in stream {
+//                for peerId in state.discoveredPeers {
+//                    guard state.pairedPeerIds.contains(peerId),
+//                          let peer = state.peerList[peerId] else { continue }
+//                    Log.debug("Auto-reconnecting to \(peer.name)")
+//                    multiPeerService.invite(peer: peer)
+//                }
+//            }
+//        }
+//    }
+
+    // If a new connectedPeer appears, remove the
+    func listenForInviteConfirmation() {
+        inviteConfirmationTask?.cancel()
+        inviteConfirmationTask = Task {
             let stream = await store.stream(\.connectedPeers)
             for await state in stream {
-                let currentPeerIds = Set(state.connectedPeers.keys)
-                let newPeers = currentPeerIds.subtracting(pairedPeerIds)
-                for peerId in newPeers {
-                    pairedPeerIds.insert(peerId)
-                    if let peer = state.connectedPeers[peerId] {
-                        bluetoothService.allowReconnect(peer: peer)
-                    }
+                for peerId in state.connectedPeers {
+                    let isPendingManualInvite = pendingManualInvites.contains(peerId)
+                    guard isPendingManualInvite else { continue }
+
+                    pendingManualInvites.remove(peerId)
+                    deviceService.pair(peerId: peerId)
                 }
             }
         }
     }
 
-    func listenForAutoReconnect() {
-        reconnectObservationTask?.cancel()
-        reconnectObservationTask = Task {
-            let stream = await store.stream(\.discoveredPeers)
+    func listenPeerListChanges() {
+        peerListObservationTask?.cancel()
+        peerListObservationTask = Task {
+            let stream = await store.stream(\.peerList)
             for await state in stream {
-                for (peerId, peer) in state.discoveredPeers {
-                    guard let paired = state.connectedPeers[peerId],
-                          paired.activeTransports.isEmpty else { continue }
-                    Log.debug("Auto-reconnecting to \(peer.name)")
-                    multiPeerService.invite(peer: peer)
-                }
+                deviceService.updatePeerList(state.peerList)
             }
         }
     }
 
-    func listenStoreChanges() {
-        Log.debug("listenServerStatus started")
-        observationTask?.cancel()
-        observationTask = Task {
+    func listenServiceStatusChanges() {
+        serviceStatusObservationTask?.cancel()
+        serviceStatusObservationTask = Task {
             let stream = await store.stream(\.isServiceActive)
             for await state in stream {
-                Log.debug("State Changed (SystemService)")
                 if state.isServiceActive {
                     multiPeerService.startService()
                     bluetoothService.startService()
