@@ -67,11 +67,15 @@ final class RootViewModel: ObservableObject {
     }
 
     func acceptInvitation() {
-        dispatcher.dispatch(DeviceAction.acceptInvitation)
+        let action = DeviceAction.acceptInvitation
+        dispatcher.dispatch(action)
+        dispatcher.dispatch(DeviceAction.createLogAction(from: action))
     }
 
     func declineInvitation() {
-        dispatcher.dispatch(DeviceAction.declineInvitation)
+        let action = DeviceAction.declineInvitation
+        dispatcher.dispatch(action)
+        dispatcher.dispatch(DeviceAction.createLogAction(from: action))
     }
     
     func resetLog() {

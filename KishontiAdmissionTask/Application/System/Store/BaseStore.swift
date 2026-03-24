@@ -32,11 +32,13 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
     private var subscribers: [UUID: AsyncStream<State>.Continuation] = [:]
     private var saveTask: Task<Void, Never>?
 
+    private var loadComplete = false
+
     public init(actionBus: ActionSource, persistence: (any StatePersisting<State>)? = nil, initialState: State) {
         _actionBus = actionBus
         _persistence = persistence
         _state = initialState
-        
+
         if persistence != nil {
             Task {
                 do {
@@ -46,7 +48,10 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
                     Log.error("Clearing...")
                     try await clear()
                 }
+                await self.markLoadComplete()
             }
+        } else {
+            loadComplete = true
         }
     }
 
@@ -73,7 +78,10 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
         }
     }
 
-    public func update(_ mutation: @Sendable (inout State) -> Void) {
+    public func update(_ mutation: @Sendable (inout State) -> Void) async {
+        if !loadComplete {
+            await waitForLoad()
+        }
         var newState = _state
         mutation(&newState)
         guard newState != _state else { return }
@@ -90,6 +98,16 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
 }
 
 private extension BaseStore {
+    func markLoadComplete() {
+        loadComplete = true
+    }
+
+    func waitForLoad() async {
+        while !loadComplete {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
     func save() async {
         try? await _persistence?.save(_state)
     }

@@ -15,7 +15,7 @@ struct AvailabilityComponent: View {
             VStack {
                 HStack {
                     Spacer()
-                    Text(connectionStatuses.globalPercentageText)
+                    Text(Keys.peerAvailabilityUptime + ": " + connectionStatuses.globalPercentageText)
                         .font(Fonts.regular(size: 16))
                         .foregroundStyle(Asset.Colors.General.green.swiftUIColor)
                 }
@@ -23,10 +23,10 @@ struct AvailabilityComponent: View {
                     .frame(height: 36)
                     .padding(.vertical)
                 HStack {
-                    ValueCard(value: "\(connectionStatuses.percentageText(.full))", valueColor: .green, title: "FULL")
-                    ValueCard(value: "\(connectionStatuses.percentageText(.multipeer))", valueColor: .yellow, title: "MULTIPEER")
-                    ValueCard(value: "\(connectionStatuses.percentageText(.bluetooth))", valueColor: .blue, title: "BLUETOOTH")
-                    ValueCard(value: "\(connectionStatuses.percentageText(.unavailable))", valueColor: .gray, title: "UNAVAILABLE")
+                    ValueCard(value: "\(connectionStatuses.percentageText(.full))", valueColor: .green, title: Keys.peerAvailabilityFull)
+                    ValueCard(value: "\(connectionStatuses.percentageText(.multipeer))", valueColor: .yellow, title: Keys.peerAvailabilityMultipeer)
+                    ValueCard(value: "\(connectionStatuses.percentageText(.bluetooth))", valueColor: .blue, title: Keys.peerAvailabilityBluetooth)
+                    ValueCard(value: "\(connectionStatuses.percentageText(.unavailable))", valueColor: .gray, title: Keys.peerAvailabilityNone)
                 }
             }
             .padding()

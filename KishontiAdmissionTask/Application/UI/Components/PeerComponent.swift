@@ -74,7 +74,15 @@ struct PeerComponent: View {
                           .init(text: "MultiLine test", color: Asset.Colors.General.yellow.swiftUIColor)],
                   image: Image.init(systemName: "power"),
                   isOn: false,
-                  heartbeats: [.bluetooth(Date()), .multipeer(Date()), .bluetooth(Date())],
+                  heartbeats: [.multipeer(Date.init(timeIntervalSinceNow: -100)),
+                               .multipeer(Date.init(timeIntervalSinceNow: -75)),
+                               .bluetooth(Date.init(timeIntervalSinceNow: -75)),
+                               .bluetooth(Date.init(timeIntervalSinceNow: -60)),
+                               .bluetooth(Date.init(timeIntervalSinceNow: -45)),
+                               .none(Date.init(timeIntervalSinceNow: -30)),
+                               .none(Date.init(timeIntervalSinceNow: -15)),
+                               .bluetooth(Date.init(timeIntervalSinceNow: 0)),
+                               .multipeer(Date.init(timeIntervalSinceNow: 0))],
                   toggle: { })
     .padding()
 
@@ -90,7 +98,15 @@ struct PeerComponent: View {
                   chips: [.init(text: "Connected", color: Asset.Colors.General.green.swiftUIColor)],
                   image: Image.init(systemName: "link"),
                   isOn: true,
-                  heartbeats: [.multipeer(Date())],
+                  heartbeats: [.multipeer(Date.init(timeIntervalSinceNow: -100)),
+                               .multipeer(Date.init(timeIntervalSinceNow: -75)),
+                               .bluetooth(Date.init(timeIntervalSinceNow: -75)),
+                               .bluetooth(Date.init(timeIntervalSinceNow: -60)),
+                               .bluetooth(Date.init(timeIntervalSinceNow: -45)),
+                               .none(Date.init(timeIntervalSinceNow: -30)),
+                               .none(Date.init(timeIntervalSinceNow: -15)),
+                               .bluetooth(Date.init(timeIntervalSinceNow: 0)),
+                               .multipeer(Date.init(timeIntervalSinceNow: 0))],
                   toggle: { })
     .padding()
 }

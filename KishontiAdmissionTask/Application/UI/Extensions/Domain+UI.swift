@@ -7,9 +7,6 @@
 
 import SwiftUI
 
-extension NetworkEventLogItem {
-}
-
 extension EventSeverity {
     var color: Color {
         switch self {
@@ -27,13 +24,13 @@ extension ConnectionStatus {
     var color: Color {
         switch self {
         case .unavailable:
-            Asset.Colors.General.gray.swiftUIColor
+            Asset.Colors.Transport.none.swiftUIColor
         case .full:
-            Asset.Colors.General.green.swiftUIColor
+            Asset.Colors.Transport.full.swiftUIColor
         case .bluetooth:
-            Asset.Colors.General.blue.swiftUIColor
+            Asset.Colors.Transport.bluetooth.swiftUIColor
         case .multipeer:
-            Asset.Colors.General.yellow.swiftUIColor
+            Asset.Colors.Transport.multipeer.swiftUIColor
         }
     }
 }
@@ -98,9 +95,9 @@ extension Set where Element == Transport {
         self.map { transport in
             switch transport {
             case .bluetooth:
-                return .init(text: "Bluetooth", color: Asset.Colors.General.blue.swiftUIColor)
+                return .init(text: transport.localizedName, color: Asset.Colors.Transport.bluetooth.swiftUIColor)
             case .multipeer:
-                return .init(text: "MultiPeer", color: Asset.Colors.General.red.swiftUIColor)
+                return .init(text: transport.localizedName, color: Asset.Colors.Transport.multipeer.swiftUIColor)
             }
         }
     }
@@ -108,11 +105,17 @@ extension Set where Element == Transport {
 
 extension Array where Element == Transport {
     var stringList: [String] {
-        self.map { transport in
-            switch transport {
-            case .bluetooth: return "Bluetooth"
-            case .multipeer: return "MultiPeer"
-            }
+        self.map { transport in transport.localizedName }
+    }
+}
+
+extension Transport {
+    var localizedName: String {
+        switch self {
+        case .bluetooth:
+            Keys.transportBluetoothName
+        case .multipeer:
+            Keys.transportMultipeerName
         }
     }
 }

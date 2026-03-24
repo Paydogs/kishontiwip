@@ -43,7 +43,7 @@ protocol MultiPeerService {
     /// Encodes `action` as JSON and sends it reliably to `peer` over the active MC session.
     func send(action: RemoteAction, to peer: Peer)
 
-    /// Disconnects the entire MC session and notifies the device manager that `peer` has disconnected.
+    /// Removes `peer` from local tracking and notifies the device manager. Does not tear down the entire session.
     func disconnect(peer: Peer)
 
     /// Replaces the set of paired peer IDs used to auto-accept incoming invitations.
@@ -58,7 +58,7 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
     
-    var pendingInvitation: PendingInvitation?
+    private(set) var pendingInvitation: PendingInvitation?
 
     private var peerIdStack: [String: MCPeerID] = [:]
     private var pairedPeers: Set<String> = []
@@ -93,9 +93,10 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
     func stopService() {
         guard isActive else { return }
         Log.debug("Stopping Multipeer service")
+        isActive = false
         stopAdvertising()
         stopBrowsing()
-        isActive = false
+        session.disconnect()
         for (name, _) in peerIdStack {
             Log.debug("Dropping multipeer transports")
             deviceManager.peerLost(name, via: .multipeer)
@@ -161,9 +162,12 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
     }
 
     func disconnect(peer: Peer) {
-        session.disconnect()
+        peerIdStack.removeValue(forKey: peer.peerId)
         deviceManager.peerDisconnected(peer.peerId, via: .multipeer)
         Log.debug("Multipeer service disconnected from \(peer.name)")
+        if peerIdStack.isEmpty {
+            session.disconnect()
+        }
     }
 
     func updatePairedPeers(_ peerIds: Set<String>) {
@@ -230,6 +234,9 @@ extension DefaultMultiPeerService: MCSessionDelegate {
             deviceManager.peerConnected(peerID.displayName, via: .multipeer)
         case .notConnected:
             deviceManager.peerDisconnected(peerID.displayName, via: .multipeer)
+            if isActive, peerIdStack[peerID.displayName] != nil {
+                deviceManager.peerDiscovered(peerID.displayName, via: .multipeer)
+            }
         default:
             break
         }
@@ -310,6 +317,8 @@ extension DefaultMultiPeerService: MCNearbyServiceBrowserDelegate {
         lostPeer peerID: MCPeerID
     ) {
         Log.debug("Multipeer Browser lost peer: \(peerID)")
+        // Browser lost != session disconnected. Keep transport if session is still alive.
+        guard !session.connectedPeers.contains(peerID) else { return }
         peerIdStack.removeValue(forKey: peerID.displayName)
         deviceManager.peerLost(peerID.displayName, via: .multipeer)
     }

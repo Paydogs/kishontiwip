@@ -1,5 +1,53 @@
 "language_code_en" = "English";
 "language_code_hu" = "Hungarian";
 
-"app_name" = "Admission Task";
+"app_name" = "Admission Task by Oláh András";
+"app_subtitle" = "Tap to change language";
+
+"transport_bluetooth_name" = "Bluetooth";
+"transport_multipeer_name" = "Multipeer";
+
 "service_toggle_title" = "Active";
+"peer_discovered_group_title" = "DISCOVERED";
+"peer_paired_group_title" = "PAIRED";
+"peer_eventlog_group_title" = "EVENT LOG";
+"incoming_connection_alert_title" = "Incoming Connection";
+"incoming_connection_alert_accept" = "Accept";
+"incoming_connection_alert_decline" = "Decline";
+"incoming_connection_alert_message" = "%@ wants to connect";
+"reset_storage_alert_title" = "Reset Storage";
+"reset_storage_alert_reset" = "Reset";
+"reset_storage_alert_cancel" = "Cancel";
+"reset_storage_alert_message" = "This will remove all followed peers and heartbeat history.";
+"reset_data_button_title" = "Reset data";
+"peer_self_title" = "This device";
+"peer_status_detected" = "Detected";
+"peer_status_connected" = "Connected";
+"peer_availability_uptime" = "Uptime";
+"peer_availability_full" = "BOTH";
+"peer_availability_bluetooth" = "BLUETOOTH";
+"peer_availability_multipeer" = "MULTIPEER";
+"peer_availability_none" = "UNAVAILABLE";
+
+"log_service_primary" = "Your app";
+"log_service_started_secondary" = "started services";
+"log_service_stopped_secondary" = "stopped services";
+"log_transport_discovered_secondary" = "discovered (%@)";
+"log_transport_lost_secondary" = "lost (%@)";
+"log_peer_connected_secondary" = "connected (%@)";
+"log_peer_disconnected_secondary" = "disconnected (%@)";
+"log_invitation_received_primary" = "Received invitation from %@";
+"log_invitation_cleared_primary" = "Invitation cleared";
+"log_heartbeat_interval_primary" = "Heartbeat interval";
+"log_heartbeat_interval_secondary" = "changed to %ds";
+"log_heartbeat_retention_primary" = "Heartbeat retention";
+"log_heartbeat_retention_secondary" = "changed to %dh";
+"log_reset_storage_primary" = "Resetting store";
+"log_clear_logs_primary" = "Clearing logs";
+"log_peer_paired_primary" = "Peer paired";
+"log_peer_unpaired_primary" = "Peer unpaired";
+"log_device_invited_secondary" = "invited";
+"log_device_unpaired_secondary" = "unpaired";
+"log_invitation_accepted_primary" = "Accepted invitation";
+"log_invitation_declined_primary" = "Declined invitation";
+"log_remote_unpaired_primary" = "Other device unpaired";

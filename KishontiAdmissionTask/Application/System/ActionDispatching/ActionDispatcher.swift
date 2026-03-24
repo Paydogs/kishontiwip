@@ -33,7 +33,7 @@ public final class ActionBus: ActionSource {
             for await action in stream {
                 guard let self else { return }
                 let key = ObjectIdentifier(Swift.type(of: action))
-                let handler = self.handlers[key]
+                let handler = self.lock.withLock { self.handlers[key] }
                 await handler?.handleAction(action)
             }
         }

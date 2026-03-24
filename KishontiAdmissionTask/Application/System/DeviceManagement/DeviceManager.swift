@@ -74,6 +74,12 @@ final class DefaultDeviceManager: DeviceManaging {
 
     func heartbeatDetected(_ peerId: PeerIdentifier, _ heartbeat: PeerHeartbeat) {
         dispatcher.dispatch(AppAction.heartbeatDetected(peerId, heartbeat))
+        
+        let peer = peer(for: peerId)
+        if let transport = heartbeat.transport,
+            !peer.activeTransports.contains(transport) {
+            dispatcher.dispatch(AppAction.transportDiscovered(peer, transport))
+        }
     }
 
     func pair(peerId: PeerIdentifier) {

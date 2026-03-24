@@ -1,5 +1,54 @@
 "language_code_en" = "Angol";
 "language_code_hu" = "Magyar";
 
-"app_name" = "Interjú feladat";
+"app_name" = "Oláh András Interjú feladat";
+"app_subtitle" = "Nyomja meg a nyelvváltáshoz";
+
+"transport_bluetooth_name" = "Bluetooth";
+"transport_multipeer_name" = "Multipeer";
+
 "service_toggle_title" = "Aktív";
+"peer_discovered_group_title" = "FELFEDEZETT";
+"peer_paired_group_title" = "PÁROSÍTOTT";
+"peer_eventlog_group_title" = "ESEMÉNYEK";
+"incoming_connection_alert_title" = "Csatlakozási kérelem";
+"incoming_connection_alert_accept" = "Elfogad";
+"incoming_connection_alert_decline" = "Elutasít";
+"incoming_connection_alert_message" = "%@ szeretne csatlakozni";
+"reset_storage_alert_title" = "Tárolt adatok törlése";
+"reset_storage_alert_reset" = "Törlés";
+"reset_storage_alert_cancel" = "Mégse";
+"reset_storage_alert_message" = "Az összes, jelenleg tárolt adat törlése";
+"reset_data_button_title" = "Adatok törlése";
+"peer_self_title" = "Ez az eszköz";
+"peer_status_detected" = "Észlelve";
+"peer_status_connected" = "Csatlakozva";
+"peer_availability_uptime" = "Elérhetőség";
+"peer_availability_full" = "MINDKETTŐ";
+"peer_availability_bluetooth" = "BLUETOOTH";
+"peer_availability_multipeer" = "MULTIPEER";
+"peer_availability_none" = "ELÉRHETETLEN";
+
+
+"log_service_primary" = "Az alkalmazás";
+"log_service_started_secondary" = "elindította a szolgáltatásokat";
+"log_service_stopped_secondary" = "leállította a szolgáltatásokat";
+"log_transport_discovered_secondary" = "felfedezve (%@)";
+"log_transport_lost_secondary" = "elveszítve (%@)";
+"log_peer_connected_secondary" = "csatlakozva (%@)";
+"log_peer_disconnected_secondary" = "lekapcsolódva (%@)";
+"log_invitation_received_primary" = "Meghívó érkezett: %@";
+"log_invitation_cleared_primary" = "Meghívó törölve";
+"log_heartbeat_interval_primary" = "Szívdobogás időköze";
+"log_heartbeat_interval_secondary" = "módosítva: %d mp";
+"log_heartbeat_retention_primary" = "Szívdobogás megőrzése";
+"log_heartbeat_retention_secondary" = "módosítva: %d óra";
+"log_reset_storage_primary" = "Tár törlése";
+"log_clear_logs_primary" = "Naplók törlése";
+"log_peer_paired_primary" = "Eszköz párosítva";
+"log_peer_unpaired_primary" = "Eszköz párosítás megszüntetve";
+"log_device_invited_secondary" = "meghívva";
+"log_device_unpaired_secondary" = "párosítás megszüntetve";
+"log_invitation_accepted_primary" = "Meghívó elfogadva";
+"log_invitation_declined_primary" = "Meghívó elutasítva";
+"log_remote_unpaired_primary" = "Másik eszköz megszüntette a párosítást";

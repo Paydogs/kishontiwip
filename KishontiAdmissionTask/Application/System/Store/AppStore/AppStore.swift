@@ -157,7 +157,7 @@ public final class AppStore: ActionHandler {
         // Reset all data
         case .resetStorage:
             await store.update { state in
-                Log.debug("Reseting storage")
+                Log.debug("Resetting storage")
                 state.peerList.removeAll()
                 state.connectedPeers.removeAll()
                 state.discoveredPeers.removeAll()

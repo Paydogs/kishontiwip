@@ -124,8 +124,14 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
 
     func reconnectKnownPeer(peer: Peer) {
         pairedPeers.insert(peer.peerId)
-        // If already discovered but rejected earlier, connect now
-        if let peripheral = resolvedPeripherals[peer.peerId], !connectedPeerIds.contains(peer.peerId) {
+        guard !connectedPeerIds.contains(peer.peerId),
+              let peripheral = resolvedPeripherals[peer.peerId] else { return }
+        if peripheral.state == .connected {
+            // Already physically connected but not yet promoted — promote now
+            connectedPeerIds.insert(peer.peerId)
+            deviceManager.peerDiscovered(peer.peerId, via: .bluetooth)
+            deviceManager.peerConnected(peer.peerId, via: .bluetooth)
+        } else {
             centralManager?.connect(peripheral, options: nil)
         }
     }
@@ -134,6 +140,14 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
 // MARK: - Peripheral Manager (Advertising)
 extension DefaultBluetoothConnectivityService: CBPeripheralManagerDelegate {
     func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+        // added 2026-03-24
+        if peripheral.state == .poweredOff {
+            for peerId in connectedPeerIds {
+                deviceManager.peerDisconnected(peerId, via: .bluetooth)
+            }
+            connectedPeerIds.removeAll()
+        }
+        // added 2026-03-24
         guard peripheral.state == .poweredOn, isActive else { return }
 
         let char = CBMutableCharacteristic(
@@ -219,7 +233,7 @@ extension DefaultBluetoothConnectivityService: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
-        Log.error("Bluetooth service connecttion failed: \(peripheral.identifier) \(error?.localizedDescription ?? "")")
+        Log.error("Bluetooth service connection failed: \(peripheral.identifier) \(error?.localizedDescription ?? "")")
         // Retry if still active
         if isActive {
             central.connect(peripheral, options: nil)
@@ -239,7 +253,7 @@ extension DefaultBluetoothConnectivityService: CBCentralManagerDelegate {
             pendingPeripherals.removeValue(forKey: peripheral)
         }
 
-        // Auto-reconnect only if still paired
+        // Queue reconnect — CoreBluetooth holds the request until the peripheral is available again
         if isActive, let peerId, pairedPeers.contains(peerId) {
             central.connect(peripheral, options: nil)
         }
@@ -264,6 +278,12 @@ extension DefaultBluetoothConnectivityService: CBPeripheralDelegate {
         }
     }
 
+    func peripheral(_ peripheral: CBPeripheral, didModifyServices invalidatedServices: [CBService]) {
+        guard invalidatedServices.contains(where: { $0.uuid == serviceUUID }) else { return }
+        Log.debug("Bluetooth service: peer removed service, disconnecting \(peripheral.identifier)")
+        centralManager?.cancelPeripheralConnection(peripheral)
+    }
+
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard characteristic.uuid == characteristicUUID,
               let data = characteristic.value,
@@ -282,8 +302,7 @@ extension DefaultBluetoothConnectivityService: CBPeripheralDelegate {
         resolvedPeripherals[peerName] = peripheral
 
         guard pairedPeers.contains(peerName) else {
-            // Not paired via MP — disconnect
-            centralManager?.cancelPeripheralConnection(peripheral)
+            // Not paired yet — stay connected, reconnectKnownPeer will promote when pairing arrives
             return
         }
 
