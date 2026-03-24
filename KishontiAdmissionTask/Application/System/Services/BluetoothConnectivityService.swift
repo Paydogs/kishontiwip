@@ -12,6 +12,9 @@ protocol BluetoothConnectivityService {
     /// Initializes the `CBCentralManager` and `CBPeripheralManager`, begins scanning and advertising.
     func startService()
 
+    /// Stops and restarts the central scan, forcing rediscovery of nearby peripherals.
+    func rediscover()
+
     /// Stops scanning/advertising, cancels all peripheral connections, and clears internal state.
     func stopService()
 
@@ -95,7 +98,7 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
 
     func sendHeartbeats() {
         for peerId in connectedPeerIds {
-            deviceManager.heartbeatDetected(peerId, via: .bluetooth)
+            deviceManager.heartbeatDetected(peerId, .bluetooth(Date()))
         }
         guard let char = characteristic,
               let data = DeviceIdentity.peerName.data(using: .utf8) else { return }
@@ -108,6 +111,15 @@ final class DefaultBluetoothConnectivityService: NSObject, BluetoothConnectivity
         centralManager?.cancelPeripheralConnection(peripheral)
         deviceManager.peerDisconnected(peer.peerId, via: .bluetooth)
         Log.debug("Bluetooth service disconnected [disconnect] from \(peer.name)")
+    }
+
+    func rediscover() {
+        guard isActive, let central = centralManager, central.state == .poweredOn else { return }
+        Log.info("Bluetooth service rediscovering")
+        central.stopScan()
+        central.scanForPeripherals(withServices: [serviceUUID], options: [
+            CBCentralManagerScanOptionAllowDuplicatesKey: false
+        ])
     }
 
     func reconnectKnownPeer(peer: Peer) {
@@ -259,7 +271,7 @@ extension DefaultBluetoothConnectivityService: CBPeripheralDelegate {
 
         // Already resolved — this is a heartbeat notification from the peer
         if let peerId = peripheralPeerIds[peripheral] {
-            deviceManager.heartbeatDetected(peerId, via: .bluetooth)
+            deviceManager.heartbeatDetected(peerId, .bluetooth(Date()))
             return
         }
 

@@ -15,7 +15,7 @@ protocol DeviceManaging {
     func peerDisconnected(_ peerId: PeerIdentifier, via transport: Transport)
     func invitationReceived(from peerId: PeerIdentifier)
     func invitationCleared()
-    func heartbeatDetected(_ peerId: PeerIdentifier, via transport: Transport)
+    func heartbeatDetected(_ peerId: PeerIdentifier, _ heartbeat: PeerHeartbeat)
     func pair(peerId: PeerIdentifier)
     func unpair(peerId: PeerIdentifier)
     func remoteActionReceived(_ action: RemoteAction, from peerId: PeerIdentifier)
@@ -72,13 +72,8 @@ final class DefaultDeviceManager: DeviceManaging {
         dispatcher.dispatch(AppAction.createLogAction(from: action))
     }
 
-    func heartbeatDetected(_ peerId: PeerIdentifier, via transport: Transport) {
-        switch transport {
-        case .bluetooth:
-            dispatcher.dispatch(AppAction.heartbeatDetected(peerId, .bluetooth(Date())))
-        case .multipeer:
-            dispatcher.dispatch(AppAction.heartbeatDetected(peerId, .multipeer(Date())))
-        }
+    func heartbeatDetected(_ peerId: PeerIdentifier, _ heartbeat: PeerHeartbeat) {
+        dispatcher.dispatch(AppAction.heartbeatDetected(peerId, heartbeat))
     }
 
     func pair(peerId: PeerIdentifier) {

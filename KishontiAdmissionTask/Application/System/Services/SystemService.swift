@@ -15,11 +15,13 @@ protocol SystemService: Actor {
 }
 
 actor DefaultSystemService: SystemService {
+    // MARK: DI Injections
     private let store = Container.shared.appStore()
     private let multiPeerService = Container.shared.multiPeerService()
     private let bluetoothService = Container.shared.bluetoothService()
     private let deviceService = Container.shared.deviceManager()
-    
+
+    // MARK: Async tasks
     private var serviceStatusObservationTask: Task<Void, Never>?
     private var heartbeatSettingsObservationTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
@@ -28,6 +30,8 @@ actor DefaultSystemService: SystemService {
     private var foregroundObservationTask: Task<Void, Never>?
     private var inviteConfirmationTask: Task<Void, Never>?
     private var peerListObservationTask: Task<Void, Never>?
+
+    // MARK: Local variables
     private var pendingManualInvites: Set<String> = []
 
     public init(actionBus: ActionSource) {
@@ -57,6 +61,7 @@ actor DefaultSystemService: SystemService {
     }
 }
 
+// MARK: DeviceAction handling
 extension DefaultSystemService: ActionHandler {
     public func handleAction(_ action: any Intent) async {
         guard let action = action as? DeviceAction else { return }
@@ -69,10 +74,14 @@ extension DefaultSystemService: ActionHandler {
             multiPeerService.disconnect(peer: peer)
             bluetoothService.disconnect(peer: peer)
             deviceService.unpair(peerId: peer.peerId)
+            multiPeerService.rediscover()
+            bluetoothService.rediscover()
         case .remoteUnpair(let peer):
             multiPeerService.disconnect(peer: peer)
             bluetoothService.disconnect(peer: peer)
             deviceService.unpair(peerId: peer.peerId)
+            multiPeerService.rediscover()
+            bluetoothService.rediscover()
         case .acceptInvitation:
             if let peerId = await store.currentState.pendingInvitation {
                 pendingManualInvites.insert(peerId)
@@ -84,7 +93,7 @@ extension DefaultSystemService: ActionHandler {
     }
 }
 
-// MARK: Tasks
+// MARK: Task implementations
 private extension DefaultSystemService {
     ///
     /// Handles the service start and stop
@@ -121,6 +130,7 @@ private extension DefaultSystemService {
             for await state in stream {
                 heartbeatTask?.cancel()
                 guard state.isServiceActive, state.heartbeatInterval > 0 else { continue }
+                
                 let interval = state.heartbeatInterval
                 heartbeatTask = Task {
                     while !Task.isCancelled {
@@ -128,6 +138,12 @@ private extension DefaultSystemService {
                         guard !Task.isCancelled else { return }
                         multiPeerService.sendHeartbeats()
                         bluetoothService.sendHeartbeats()
+                        let currentState = await store.currentState
+                        for peerId in currentState.pairedPeerIds {
+                            guard let peer = currentState.peerList[peerId],
+                                  peer.activeTransports.isEmpty else { continue }
+                            deviceService.heartbeatDetected(peerId, .none(Date()))
+                        }
                     }
                 }
             }
@@ -149,17 +165,19 @@ private extension DefaultSystemService {
             let stream = await store.stream(\.pairedPeerIds)
             for await state in stream {
                 let currentPairs = state.pairedPeerIds
+                multiPeerService.updatePairedPeers(currentPairs)
+                
                 let newPeers = currentPairs.subtracting(knownPairedIds)
                 let unpairedPeers = knownPairedIds.subtracting(currentPairs)
                 knownPairedIds = currentPairs
-
-                multiPeerService.updatePairedPeers(currentPairs)
 
                 for peerId in unpairedPeers {
                     guard let peer = state.peerList[peerId] else { continue }
                     bluetoothService.disconnect(peer: peer)
                 }
-                
+
+                guard state.isServiceActive else { continue }
+
                 for peerId in newPeers {
                     guard let peer = state.peerList[peerId] else { continue }
                     bluetoothService.reconnectKnownPeer(peer: peer)
@@ -178,6 +196,8 @@ private extension DefaultSystemService {
         reconnectObservationTask = Task {
             let stream = await store.stream(\.discoveredPeers, \.pairedPeerIds)
             for await state in stream {
+                guard state.isServiceActive else { continue }
+                
                 for peerId in state.discoveredPeers {
                     guard state.pairedPeerIds.contains(peerId),
                           let peer = state.peerList[peerId] else { continue }
@@ -189,7 +209,7 @@ private extension DefaultSystemService {
     }
 
     ///
-    /// Re-invites all paired peers via MC when the service is active, recovering connections dropped while the app was backgrounded.
+    /// Re-invites all paired peers on Multipeer when the service is active, recovering connections dropped while the app was backgrounded.
     ///
     /// Listens for `didBecomeActive` notifications
     ///
@@ -200,6 +220,8 @@ private extension DefaultSystemService {
             for await _ in notifications {
                 let state = await store.currentState
                 guard state.isServiceActive else { continue }
+                multiPeerService.rediscover()
+                bluetoothService.rediscover()
                 for peerId in state.pairedPeerIds {
                     guard let peer = state.peerList[peerId] else { continue }
                     Log.debug("foregroundObservationTask Auto-reconnecting to \(peer.name)")
@@ -209,6 +231,7 @@ private extension DefaultSystemService {
         }
     }
 
+    ///
     /// When a peer from `pendingManualInvites` connects, removes it from the pending set and pairs it via the device service.
     ///
     /// Observes `connectedPeers`
@@ -229,6 +252,7 @@ private extension DefaultSystemService {
         }
     }
 
+    ///
     /// Forwards every update to the device service to keep its local cache in sync.
     ///
     /// Observes `peerList`

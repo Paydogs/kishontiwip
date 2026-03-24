@@ -10,25 +10,25 @@ import Foundation
 public typealias PeerIdentifier = String
 
 public struct AppState: StoreState {
-    // Shows if the application is active
+    /// Shows if the application is active
     public var isServiceActive: Bool
-    // List of known peers, with its data
+    /// List of known peers, with its data, name, etc.
     public var peerList: [PeerIdentifier: Peer]
-    // Peers in discovered state
+    /// Peers in discovered state
     public var discoveredPeers: Set<PeerIdentifier>
-    // Peers in connected state
+    /// Peers in connected state
     public var connectedPeers: Set<PeerIdentifier>
-    // Paired peers
+    /// Paired peers
     public var pairedPeerIds: Set<PeerIdentifier>
-    // Pending invitations
+    /// Pending invitations
     public var pendingInvitation: PeerIdentifier?
-    // Log items
+    /// Log items
     public var logs: [NetworkEventLogItem]
-    // Current heartbeat interval
+    /// Current heartbeat interval
     public var heartbeatInterval: TimeInterval
-    // Current heartbeat retention hours
+    /// Current heartbeat retention hours
     public var heartbeatRetentionHours: Int
-    // Heartbeat
+    /// List of heartbeats per peer
     public var heartbeats: [PeerIdentifier: [PeerHeartbeat]]
 
     public init(isServiceActive: Bool = false,
@@ -53,7 +53,9 @@ public struct AppState: StoreState {
         self.heartbeats = heartbeats
     }
 
-    // These values will be persisted
+    ///
+    /// These values will be persisted
+    ///
     private enum CodingKeys: String, CodingKey {
         case isServiceActive
         case pairedPeerIds
@@ -62,7 +64,9 @@ public struct AppState: StoreState {
         case heartbeats
     }
 
-    // This controls when the system needs to save
+    ///
+    /// This controls when the system needs to save
+    ///
     public func needsPersistence(comparedTo previous: AppState) -> Bool {
         self.isServiceActive != previous.isServiceActive ||
         self.pairedPeerIds != previous.pairedPeerIds ||
@@ -71,7 +75,9 @@ public struct AppState: StoreState {
         self.heartbeats != previous.heartbeats
     }
 
-    // Init from stored persisted data
+    ///
+    /// Init from stored persisted data
+    ///
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         isServiceActive = (try? container.decode(Bool.self, forKey: .isServiceActive)) ?? false

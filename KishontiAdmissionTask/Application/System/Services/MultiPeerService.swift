@@ -19,6 +19,9 @@ protocol MultiPeerService {
     /// Creates the advertiser and browser, then begins advertising and browsing for peers.
     func startService()
 
+    /// Restarts the browser, forcing a fresh `foundPeer`/`lostPeer` cycle for all nearby peers.
+    func rediscover()
+
     /// Stops advertising and browsing, notifies the device manager of every lost peer, and clears the peer-ID stack.
     func stopService()
 
@@ -78,6 +81,13 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
         startAdvertising()
         startBrowsing()
         isActive = true
+    }
+
+    func rediscover() {
+        guard isActive else { return }
+        Log.info("Multipeer service rediscovering")
+        stopBrowsing()
+        startBrowsing()
     }
     
     func stopService() {
@@ -164,7 +174,7 @@ final class DefaultMultiPeerService: NSObject, MultiPeerService {
 private extension DefaultMultiPeerService {
     func reportHeartbeats() {
         for peerID in session.connectedPeers {
-            deviceManager.heartbeatDetected(peerID.displayName, via: .multipeer)
+            deviceManager.heartbeatDetected(peerID.displayName, .multipeer(Date()))
         }
     }
 

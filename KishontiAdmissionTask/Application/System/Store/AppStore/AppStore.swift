@@ -68,12 +68,11 @@ public final class AppStore: ActionHandler {
             await store.update { state in
                 guard var existing = state.peerList[peerId] else { return }
                 existing.activeTransports.remove(transport)
-                if existing.activeTransports.isEmpty {
+                state.peerList[peerId] = existing
+                if existing.activeTransports.isEmpty && !state.pairedPeerIds.contains(peerId) {
                     state.connectedPeers.remove(peerId)
-                } else {
-                    state.peerList[peerId] = existing
-                    Log.debug("[Store] transportLost Updated peerList: \(state.peerList)")
                 }
+                Log.debug("[Store] transportLost Updated peerList: \(state.peerList)")
             }
         // Peer connected
         case .peerConnected(let peer, let transport):
@@ -90,12 +89,11 @@ public final class AppStore: ActionHandler {
             await store.update { state in
                 guard var existing = state.peerList[peerId] else { return }
                 existing.activeTransports.remove(transport)
-                if existing.activeTransports.isEmpty {
+                state.peerList[peerId] = existing
+                if existing.activeTransports.isEmpty && !state.pairedPeerIds.contains(peerId) {
                     state.connectedPeers.remove(peerId)
-                } else {
-                    state.peerList[peerId] = existing
-                    Log.debug("[Store] peerDisconnected, Updated peerList: \(state.peerList)")
                 }
+                Log.debug("[Store] peerDisconnected, Updated peerList: \(state.peerList)")
             }
         // Invitation received from peer
         case .invitationReceived(let peerId):
